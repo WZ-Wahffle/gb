@@ -1,4 +1,5 @@
 #include "carts/nocart.h"
+#include "ppu.h"
 #include "types.h"
 #include <stdio.h>
 
@@ -28,6 +29,8 @@ int main(int argc, char **argv) {
         ASSERT(0, "Unsupported cart type %02x\n", cart_type);
         break;
     }
+
+    ui();
 
     cpu.memory.free();
     fclose(f);
