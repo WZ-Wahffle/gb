@@ -34,5 +34,4 @@ imgui: imgui/imgui.cpp
 
 
 build:
-	gcc -o out/gb src/*.c -Isrc/include/ -Lsrc/lib/
-	./out/gb
+	gcc -o out/gb src/*.c src/carts/*.c -Isrc/include/ -Lsrc/lib/

@@ -1,5 +1,4 @@
 ---
+BasedOnStyle: llvm
 IndentWidth: 4
-Language: C
-CStandard: c23
 ---
