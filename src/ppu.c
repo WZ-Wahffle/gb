@@ -1,7 +1,7 @@
 #include "ppu.h"
+#include "cpu.h"
 #include "raylib.h"
 #include "types.h"
-#include <stdlib.h>
 
 void ui(void) {
     SetTraceLogLevel(LOG_ERROR);
@@ -14,6 +14,8 @@ void ui(void) {
     while (!WindowShouldClose()) {
         BeginDrawing();
         ClearBackground(BLACK);
+
+        execute();
 
         UpdateTexture(texture, framebuffer);
         DrawTexturePro(texture,

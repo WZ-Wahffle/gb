@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
         cpu.memory.free = nocart_free;
         break;
     default:
-        ASSERT(0, "Unsupported cart type %02x\n", cart_type);
+        ASSERT(0, "Unsupported cart type 0x%02x\n", cart_type);
         break;
     }
 
