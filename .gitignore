@@ -1,0 +1,7 @@
+out/*
+src/include/*
+src/lib/*
+raylib
+rlImGui
+imgui
+imgui.ini
