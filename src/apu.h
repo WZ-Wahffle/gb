@@ -3,6 +3,7 @@
 
 #include "types.h"
 
+void apu_init(void);
 void audio_master_control(uint8_t val);
 void sound_panning(uint8_t val);
 void master_volume_vin_panning(uint8_t val);

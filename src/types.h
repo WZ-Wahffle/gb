@@ -32,6 +32,7 @@
 #define DOT_LENGTH (1. / DOT_FREQ) // independant of CPU frequency!
 #define CYCLES_PER_DOT (CPU_FREQ / DOT_FREQ)
 #define SCANLINE_COUNT 154
+#define SAMPLE_RATE 48000
 
 typedef enum { B, C, D, E, H, L, INDHL, A } r8_t;
 
@@ -46,6 +47,8 @@ typedef enum { NZ_COND, Z_COND, NC_COND, C_COND } cond_t;
 typedef enum { Z_STATUS, N_STATUS, H_STATUS, C_STATUS } status_t;
 
 typedef enum { STOPPED, STEPPED, RUNNING } state_t;
+
+typedef enum { EIGHTH, QUARTER, HALF, THREEQUARTERS } duty_cycle_t;
 
 typedef struct {
     uint8_t y;
@@ -105,13 +108,14 @@ typedef struct {
     uint8_t envelope_initial_volume;
     bool envelope_dir;
     uint8_t envelope_pace;
+    uint8_t volume;
 
     uint8_t period_low;
 
     uint8_t period_high;
     bool length_enable;
-    bool trigger;
 
+    uint32_t frequency;
 } pulse_channel_t;
 
 typedef struct {

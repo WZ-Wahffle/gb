@@ -1,3 +1,4 @@
+#include "apu.h"
 #include "carts/nocart.h"
 #include "ppu.h"
 #include "types.h"
@@ -36,6 +37,7 @@ int main(int argc, char **argv) {
         break;
     }
 
+    apu_init();
     on_exit(exit_cb, NULL);
     ui();
 
