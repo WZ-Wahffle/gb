@@ -65,6 +65,26 @@ static uint16_t next_16(void) {
     return ret;
 }
 
+static void push_8(uint8_t val) { write_8(cpu.sp--, val); }
+
+static void push_16(uint16_t val) {
+    push_8(HIBYTE(val));
+    push_8(LOBYTE(val));
+}
+
+static uint8_t pop_8(void) { return read_8(++cpu.sp); }
+
+static uint16_t pop_16(void) {
+    uint8_t lsb = pop_8();
+    uint8_t msb = pop_8();
+    return TO_U16(lsb, msb);
+}
+
+static void call(uint16_t addr) {
+    push_16(cpu.pc);
+    cpu.pc = addr;
+}
+
 // register modify functions
 
 static uint16_t r16_read(r16_t src) {
@@ -202,6 +222,41 @@ static void r16mem_write(r16_mem_t dst, uint8_t val) {
     }
 }
 
+static uint16_t r16stk_read(r16_stk_t src) {
+    switch (src) {
+    case BC_STK:
+        return TO_U16(cpu.c, cpu.b);
+    case DE_STK:
+        return TO_U16(cpu.e, cpu.d);
+    case HL_STK:
+        return TO_U16(cpu.l, cpu.h);
+    case AF_STK:
+        return TO_U16(cpu.f, cpu.a);
+    default:
+        UNREACHABLE_SWITCH(src);
+    }
+}
+
+static void r16stk_write(r16_stk_t dst, uint16_t val) {
+    switch (dst) {
+    case BC_STK:
+        r16_write(BC, val);
+        break;
+    case DE_STK:
+        r16_write(DE, val);
+        break;
+    case HL_STK:
+        r16_write(HL, val);
+        break;
+    case AF_STK:
+        cpu.a = HIBYTE(val);
+        cpu.f = LOBYTE(val);
+        break;
+    default:
+    UNREACHABLE_SWITCH(dst);
+    }
+}
+
 void execute(void) {
     cpu.opcode = next_8();
     uint8_t opcode = cpu.opcode;
@@ -291,7 +346,7 @@ void execute(void) {
                     cpu.pc += (((int16_t)next_8()) - 256);
                 else
                     next_8();
-            } else if ((opcode & 0b1000) == 0) {
+            } else if ((opcode & 0b100) == 0) {
                 switch (opcode & 0b1111) {
                 case 1:
                     r16_write((opcode >> 4) & 0b11, next_16());
@@ -306,7 +361,7 @@ void execute(void) {
                     TODO("add hl, r16");
                     break;
                 case 10:
-                    TODO("ld a, [r16mem]");
+                    cpu.a = r16mem_read((opcode >> 4) & 0b11);
                     break;
                 case 11:
                     TODO("dec r16");
@@ -397,7 +452,7 @@ void execute(void) {
             else if (opcode == 0b11101001)
                 TODO("jp hl");
             else if (opcode == 0b11001101)
-                TODO("call imm16");
+                call(next_16());
             else if (opcode == 0b11100010) {
                 write_8(0xff00 + cpu.c, cpu.a);
             } else if (opcode == 0b11100000) {
@@ -435,7 +490,7 @@ void execute(void) {
                     TODO("call cond, imm16");
                     break;
                 case 5:
-                    TODO("push r16stk");
+                    push_16(r16stk_read((opcode >> 4) & 0b11));
                     break;
                 case 7:
                     TODO("rst tgt3");

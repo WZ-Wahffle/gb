@@ -328,6 +328,7 @@ void cpp_imgui_render(void) {
         uint8_t opcode = read_8(cpu.pc);
         if (opcode_strings[opcode].find("%04x") != std::string::npos) {
             ImGui::Text(opcode_strings[opcode].c_str(), read_16(cpu.pc + 1));
+
         } else if (opcode_strings[opcode].find("%d") != std::string::npos) {
             ImGui::Text(opcode_strings[opcode].c_str(),
                         read_8(cpu.pc + 1) - 256);
@@ -336,6 +337,8 @@ void cpp_imgui_render(void) {
         } else {
             ImGui::Text("%s", opcode_strings[opcode].c_str());
         }
+        ImGui::SameLine();
+        ImGui::Text(", opcode: 0x%02x", opcode);
     }
 
     ImGui::Text("PC: 0x%04x", cpu.pc);

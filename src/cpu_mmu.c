@@ -47,6 +47,8 @@ uint8_t mmu_read(uint16_t addr) {
         return ((uint8_t *)cpu.memory.oam)[addr - 0xfe00];
     } else if (addr < 0xff00) {
         ASSERT(0, "Read from 0x%04x, Nintendo says no\n", addr);
+    } else if (addr >= 0xff80 && addr < 0xffff) {
+        return cpu.memory.hram[addr - 0xff80];
     } else {
         ASSERT(0, "TODO: IO range, reading from 0x%04x\n", addr);
     }
@@ -69,6 +71,8 @@ void mmu_write(uint16_t addr, uint8_t value) {
         ((uint8_t *)cpu.memory.oam)[addr - 0xfe00] = value;
     } else if (addr < 0xff00) {
         ASSERT(0, "Write of 0x%02x to 0x%04x, Nintendo says no\n", value, addr);
+    } else if (addr >= 0xff80 && addr < 0xffff) {
+        cpu.memory.hram[addr - 0xff80] = value;
     } else {
         switch (addr) {
         case 0xff10:

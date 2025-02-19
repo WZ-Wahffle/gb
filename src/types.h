@@ -60,6 +60,7 @@ typedef struct {
     void (*free)(void);
     uint8_t vram[0x2000];
     uint8_t wram[0x2000];
+    uint8_t hram[0x7f];
     oam_t oam[40];
 } cpu_mmu_t;
 
