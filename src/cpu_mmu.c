@@ -1,4 +1,7 @@
 #include "cpu_mmu.h"
+#include "apu.h"
+#include "ppu.h"
+#include "types.h"
 
 extern cpu_t cpu;
 
@@ -32,17 +35,17 @@ uint8_t mmu_read(uint16_t addr) {
         return boot_rom[addr];
     } else if (addr < 0x8000) {
         return cpu.memory.read(addr);
-    } else if(addr < 0xa000) {
+    } else if (addr < 0xa000) {
         return cpu.memory.vram[addr % 0x2000];
-    } else if(addr < 0xc000) {
+    } else if (addr < 0xc000) {
         return cpu.memory.read(addr);
-    } else if(addr < 0xe000) {
+    } else if (addr < 0xe000) {
         return cpu.memory.wram[addr % 0x2000];
-    } else if(addr < 0xfe00) {
+    } else if (addr < 0xfe00) {
         ASSERT(0, "Read from 0x%04x, Nintendo says no\n", addr);
-    } else if(addr < 0xfea0) {
-        return ((uint8_t*)cpu.memory.oam)[addr - 0xfe00];
-    } else if(addr < 0xff00) {
+    } else if (addr < 0xfea0) {
+        return ((uint8_t *)cpu.memory.oam)[addr - 0xfe00];
+    } else if (addr < 0xff00) {
         ASSERT(0, "Read from 0x%04x, Nintendo says no\n", addr);
     } else {
         ASSERT(0, "TODO: IO range, reading from 0x%04x\n", addr);
@@ -54,19 +57,49 @@ void mmu_write(uint16_t addr, uint8_t value) {
         boot_rom[addr] = value;
     } else if (addr < 0x8000) {
         cpu.memory.write(addr, value);
-    } else if(addr < 0xa000) {
+    } else if (addr < 0xa000) {
         cpu.memory.vram[addr % 0x2000] = value;
-    } else if(addr < 0xc000) {
+    } else if (addr < 0xc000) {
         cpu.memory.write(addr, value);
-    } else if(addr < 0xe000) {
+    } else if (addr < 0xe000) {
         cpu.memory.wram[addr % 0x2000] = value;
-    } else if(addr < 0xfe00) {
+    } else if (addr < 0xfe00) {
         ASSERT(0, "Write of 0x%02x to 0x%04x, Nintendo says no\n", value, addr);
-    } else if(addr < 0xfea0) {
-        ((uint8_t*)cpu.memory.oam)[addr - 0xfe00] = value;
-    } else if(addr < 0xff00) {
+    } else if (addr < 0xfea0) {
+        ((uint8_t *)cpu.memory.oam)[addr - 0xfe00] = value;
+    } else if (addr < 0xff00) {
         ASSERT(0, "Write of 0x%02x to 0x%04x, Nintendo says no\n", value, addr);
     } else {
-        ASSERT(0, "TODO: IO range, writing 0x%02x to 0x%04x\n", value, addr);
+        switch (addr) {
+        case 0xff10:
+            ch1_sweep(value);
+            break;
+        case 0xff11:
+            ch1_length_timer_duty_cycle(value);
+            break;
+        case 0xff12:
+            ch1_volume_envelope(value);
+            break;
+        case 0xff13:
+            ch1_period_low(value);
+            break;
+        case 0xff14:
+            ch1_period_high_control(value);
+            break;
+        case 0xff24:
+            master_volume_vin_panning(value);
+            break;
+        case 0xff25:
+            sound_panning(value);
+            break;
+        case 0xff26:
+            audio_master_control(value);
+            break;
+        case 0xff47:
+            set_palette(value);
+            break;
+        default:
+            UNREACHABLE_SWITCH(addr);
+        }
     }
 }

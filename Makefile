@@ -33,5 +33,6 @@ imgui: imgui/imgui.cpp
 	cp imgui/imconfig.h rlImGui/imconfig.h
 
 
-build:
-	gcc -g -o out/gb src/*.c src/carts/*.c -Isrc/include/ -Lsrc/lib/ -lraylib -lSDL2 -lm -Wall -Wextra -Werror -Wno-unused-function
+build: imgui rlImGui raylib
+	g++ -c -o src/ui.o src/ui.cpp -Isrc/include/ -Wall -Wextra -Werror -Wno-unused-function
+	gcc -o out/gb src/*.c src/carts/*.c src/ui.o -Isrc/include/ -Lsrc/lib/ -lraylib -lSDL2 -lm -lrlImGui -limgui -Wall -Wextra -Werror -lstdc++ -Wno-unused-function

@@ -1,15 +1,24 @@
 #ifndef TYPES_H_
 #define TYPES_H_
 
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include "raylib.h"
 #include <assert.h>
 #include <stdbool.h>
-#include "raylib.h"
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
-#define ASSERT(val, msg, ...) do { if(!(val)) {printf(msg, __VA_ARGS__);assert(0);} } while(0)
-#define UNREACHABLE_SWITCH(val) ASSERT(0, "Illegal value in switch: %d, 0x%04x\n", val, val)
+// custom assertion macro to allow registering exit callback
+#define ASSERT(val, msg, ...)                                                  \
+    do {                                                                       \
+        if (!(val)) {                                                          \
+            printf("%s:%d: Assertion failed:\n", __FILE__, __LINE__);          \
+            printf(msg, __VA_ARGS__);                                          \
+            exit(1);                                                           \
+        }                                                                      \
+    } while (0)
+#define UNREACHABLE_SWITCH(val)                                                \
+    ASSERT(0, "Illegal value in switch: %d, 0x%04x\n", val, val)
 #define TODO(val) ASSERT(0, "%sTODO: " val "\n", "")
 #define TO_U16(lsb, msb) ((lsb & 0xff) | ((msb & 0xff) << 8))
 #define LOBYTE(val) ((val) & 0xff)
@@ -24,29 +33,19 @@
 #define CYCLES_PER_DOT (CPU_FREQ / DOT_FREQ)
 #define SCANLINE_COUNT 154
 
-typedef enum {
-    B, C, D, E, H, L, INDHL, A
-} r8_t;
+typedef enum { B, C, D, E, H, L, INDHL, A } r8_t;
 
-typedef enum {
-    BC, DE, HL, SP
-} r16_t;
+typedef enum { BC, DE, HL, SP } r16_t;
 
-typedef enum {
-    BC_STK, DE_STK, HL_STK, AF_STK
-} r16_stk_t;
+typedef enum { BC_STK, DE_STK, HL_STK, AF_STK } r16_stk_t;
 
-typedef enum {
-    BC_MEM, DE_MEM, HLINC_MEM, HLDEC_MEM
-} r16_mem_t;
+typedef enum { BC_MEM, DE_MEM, HLINC_MEM, HLDEC_MEM } r16_mem_t;
 
-typedef enum {
-    NZ_COND, Z_COND, NC_COND, C_COND
-} cond_t;
+typedef enum { NZ_COND, Z_COND, NC_COND, C_COND } cond_t;
 
-typedef enum {
-    Z_STATUS, N_STATUS, H_STATUS, C_STATUS
-} status_t;
+typedef enum { Z_STATUS, N_STATUS, H_STATUS, C_STATUS } status_t;
+
+typedef enum { STOPPED, STEPPED, RUNNING } state_t;
 
 typedef struct {
     uint8_t y;
@@ -69,16 +68,23 @@ typedef struct {
     uint8_t a, b, c, d, e, f, h, l;
     uint16_t sp, pc;
     double remaining_cycles;
+    uint8_t opcode;
+    state_t state;
 } cpu_t;
 
 typedef struct {
     uint8_t mode;
+    uint8_t color_0;
+    uint8_t color_1;
+    uint8_t color_2;
+    uint8_t color_3;
 } ppu_t;
 
 typedef struct {
     AudioStream handle;
     bool pan_left;
     bool pan_right;
+    bool enable;
 
     uint8_t sweep_pace;
     bool sweep_direction;
@@ -94,9 +100,51 @@ typedef struct {
     uint8_t period_low;
 
     uint8_t period_high;
+    bool length_enable;
     bool trigger;
 
 } pulse_channel_t;
+
+typedef struct {
+    AudioStream handle;
+    bool pan_left;
+    bool pan_right;
+    bool enable;
+
+    bool dac_on;
+
+    uint8_t initial_length_timer;
+
+    uint8_t output_level;
+
+    uint8_t period_low;
+
+    uint8_t period_high;
+    bool length_enable;
+    bool trigger;
+
+    uint8_t wave_ram[16];
+} wave_channel_t;
+
+typedef struct {
+    AudioStream handle;
+    bool pan_left;
+    bool pan_right;
+    bool enable;
+
+    uint8_t intitial_length_timer;
+
+    uint8_t envelope_initial_volume;
+    bool envelope_dir;
+    uint8_t envelope_pace;
+
+    uint8_t clock_shift;
+    bool narrow_lfsr;
+    uint8_t clock_divider;
+
+    bool length_enable;
+    bool trigger;
+} noise_channel_t;
 
 typedef struct {
     bool audio_enable;
@@ -106,6 +154,8 @@ typedef struct {
     uint8_t vol_right;
     pulse_channel_t ch1;
     pulse_channel_t ch2;
+    wave_channel_t ch3;
+    noise_channel_t ch4;
 } apu_t;
 
 #endif

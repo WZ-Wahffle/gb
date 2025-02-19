@@ -6,3 +6,4 @@ rlImGui
 imgui
 imgui.ini
 input/
+*.o

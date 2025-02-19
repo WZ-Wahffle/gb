@@ -203,10 +203,12 @@ static void r16mem_write(r16_mem_t dst, uint8_t val) {
 }
 
 void execute(void) {
-    uint8_t opcode = next_8();
+    cpu.opcode = next_8();
+    uint8_t opcode = cpu.opcode;
     cpu.remaining_cycles -= cycle_lookup[opcode];
-    if (opcode == 0xcb) {
-        opcode = next_8();
+    if (cpu.opcode == 0xcb) {
+        cpu.opcode = next_8();
+        opcode = cpu.opcode;
         cpu.remaining_cycles -= extended_lookup[opcode % 8];
         if ((opcode >> 6) == 0) {
             switch ((opcode >> 3) & 0b111) {
@@ -312,9 +314,12 @@ void execute(void) {
                 }
             } else {
                 switch (opcode & 0b11) {
-                case 0:
-                    TODO("inc r8");
-                    break;
+                case 0: {
+                    uint8_t result = r8_read((opcode >> 3) & 0b111) + 1;
+                    set_status_bit(Z_STATUS, result == 0);
+                    set_status_bit(N_STATUS, false);
+                    set_status_bit(H_STATUS, (result & 0xf) == 0);
+                } break;
                 case 1:
                     TODO("dec r8");
                     break;
@@ -327,7 +332,11 @@ void execute(void) {
             }
             break;
         case 1:
-            TODO("1");
+            if (opcode == 0b01110110)
+                TODO("halt");
+            else {
+                r8_write((opcode >> 3) & 0b111, r8_read(opcode & 0b111));
+            }
             break;
         case 2:
             switch ((opcode >> 3) & 0b111) {
@@ -389,11 +398,11 @@ void execute(void) {
                 TODO("jp hl");
             else if (opcode == 0b11001101)
                 TODO("call imm16");
-            else if (opcode == 0b11100010)
-                TODO("ldh [c], a");
-            else if (opcode == 0b11100000)
-                TODO("ldh [imm8], a");
-            else if (opcode == 0b11101010)
+            else if (opcode == 0b11100010) {
+                write_8(0xff00 + cpu.c, cpu.a);
+            } else if (opcode == 0b11100000) {
+                write_8(0xff00 + next_8(), cpu.a);
+            } else if (opcode == 0b11101010)
                 TODO("ld [imm16], a");
             else if (opcode == 0b11110010)
                 TODO("ldh a, [c]");

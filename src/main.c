@@ -6,6 +6,13 @@ extern cpu_t cpu;
 extern ppu_t ppu;
 extern apu_t apu;
 
+void exit_cb(int code, void* param) {
+    (void) code;
+    (void) param;
+    printf("\nPC: 0x%04x\n", cpu.pc);
+    printf("Previous opcode: 0x%02x\n", cpu.opcode);
+}
+
 int main(int argc, char **argv) {
     ASSERT(argc == 2, "Incorrect number of parameters, found %d. Usage: \n./gb <game>.gb\n", argc);
     FILE *f = fopen(argv[1], "rb");
@@ -29,6 +36,7 @@ int main(int argc, char **argv) {
         break;
     }
 
+    on_exit(exit_cb, NULL);
     ui();
 
     cpu.memory.free();
