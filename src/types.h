@@ -26,8 +26,8 @@
 #define CPU_FREQ 4194304.
 #define VIEWPORT_WIDTH 160
 #define VIEWPORT_HEIGHT 144
-#define WINDOW_WIDTH (VIEWPORT_WIDTH * 4)
-#define WINDOW_HEIGHT (VIEWPORT_HEIGHT * 4)
+#define WINDOW_WIDTH (VIEWPORT_WIDTH * 6)
+#define WINDOW_HEIGHT (VIEWPORT_HEIGHT * 6)
 #define DOT_FREQ 4194304.
 #define DOT_LENGTH (1. / DOT_FREQ) // independant of CPU frequency!
 #define CYCLES_PER_DOT (CPU_FREQ / DOT_FREQ)
@@ -70,6 +70,7 @@ typedef struct {
     double remaining_cycles;
     uint8_t opcode;
     state_t state;
+    uint16_t breakpoint;
 } cpu_t;
 
 typedef struct {

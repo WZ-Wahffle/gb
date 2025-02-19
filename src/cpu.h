@@ -4,6 +4,14 @@
 #include "types.h"
 #include "cpu_mmu.h"
 
+#ifdef __cplusplus
+#define EXTERNC extern "C"
+#else
+#define EXTERNC
+#endif
+
 void execute(void);
+EXTERNC uint8_t read_8(uint16_t addr);
+EXTERNC uint16_t read_16(uint16_t addr);
 
 #endif

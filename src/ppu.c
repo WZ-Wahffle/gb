@@ -23,6 +23,10 @@ static void catch_up_cpu(double cycles_to_add) {
                 cpu.state = STOPPED;
                 break;
             }
+            if(cpu.pc == cpu.breakpoint) {
+                cpu.state = STOPPED;
+                break;
+            }
         }
     }
 }

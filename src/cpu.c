@@ -49,11 +49,11 @@ static bool resolve_cond(cond_t cond) {
     }
 }
 
-static uint8_t read_8(uint16_t addr) { return mmu_read(addr); }
+uint8_t read_8(uint16_t addr) { return mmu_read(addr); }
 
 static void write_8(uint16_t addr, uint8_t val) { return mmu_write(addr, val); }
 
-static uint16_t read_16(uint16_t addr) {
+uint16_t read_16(uint16_t addr) {
     return TO_U16(read_8(addr), read_8(addr + 1));
 }
 
