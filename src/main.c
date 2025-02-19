@@ -1,7 +1,6 @@
 #include "carts/nocart.h"
 #include "ppu.h"
 #include "types.h"
-#include <stdio.h>
 
 extern cpu_t cpu;
 extern ppu_t ppu;

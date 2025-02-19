@@ -30,11 +30,11 @@ typedef enum {
 
 typedef enum {
     BC_STK, DE_STK, HL_STK, AF_STK
-} r16_stk;
+} r16_stk_t;
 
 typedef enum {
     BC_MEM, DE_MEM, HLINC_MEM, HLDEC_MEM
-} r16_mem;
+} r16_mem_t;
 
 typedef enum {
     NZ_COND, Z_COND, NC_COND, C_COND
