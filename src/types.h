@@ -76,10 +76,17 @@ typedef struct {
 
 typedef struct {
     uint8_t mode;
-    uint8_t color_0;
-    uint8_t color_1;
-    uint8_t color_2;
-    uint8_t color_3;
+    uint8_t color_0, color_1, color_2, color_3;
+    uint8_t scroll_x, scroll_y;
+    bool ppu_enable;
+    bool window_tile_map_location;
+    bool window_enable;
+    bool bg_window_tile_data_location;
+    bool bg_tile_map_location;
+    bool large_objects;
+    bool enable_objects;
+    bool bg_window_enable;
+    uint8_t ly;
 } ppu_t;
 
 typedef struct {

@@ -331,7 +331,7 @@ void cpp_imgui_render(void) {
 
         } else if (opcode_strings[opcode].find("%d") != std::string::npos) {
             ImGui::Text(opcode_strings[opcode].c_str(),
-                        read_8(cpu.pc + 1) - 256);
+                        (int8_t)read_8(cpu.pc + 1));
         } else if (opcode_strings[opcode].find("%") != std::string::npos) {
             ImGui::Text(opcode_strings[opcode].c_str(), read_8(cpu.pc + 1));
         } else {

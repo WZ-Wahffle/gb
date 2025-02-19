@@ -4,6 +4,7 @@
 #include "types.h"
 
 extern cpu_t cpu;
+extern ppu_t ppu;
 
 static uint8_t boot_rom[] = {
     0x31, 0xfe, 0xff, 0xaf, 0x21, 0xff, 0x9f, 0x32, 0xcb, 0x7c, 0x20, 0xfb,
@@ -50,7 +51,14 @@ uint8_t mmu_read(uint16_t addr) {
     } else if (addr >= 0xff80 && addr < 0xffff) {
         return cpu.memory.hram[addr - 0xff80];
     } else {
-        ASSERT(0, "TODO: IO range, reading from 0x%04x\n", addr);
+        switch (addr) {
+        case 0xff42:
+            return ppu.scroll_y;
+        case 0xff44:
+            return ppu.ly;
+        default:
+            UNREACHABLE_SWITCH(addr);
+        }
     }
 }
 
@@ -98,6 +106,15 @@ void mmu_write(uint16_t addr, uint8_t value) {
             break;
         case 0xff26:
             audio_master_control(value);
+            break;
+        case 0xff40:
+            lcd_control(value);
+            break;
+        case 0xff42:
+            ppu.scroll_y = value;
+            break;
+        case 0xff43:
+            ppu.scroll_x = value;
             break;
         case 0xff47:
             set_palette(value);

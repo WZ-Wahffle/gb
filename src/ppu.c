@@ -7,11 +7,24 @@
 extern cpu_t cpu;
 extern ppu_t ppu;
 
+static uint32_t colors[] = {0xffffffff, 0xffc8c8c8, 0xff828282, 0xff000000};
+
 void set_palette(uint8_t value) {
     ppu.color_0 = (value >> 0) & 0b11;
     ppu.color_1 = (value >> 2) & 0b11;
     ppu.color_2 = (value >> 4) & 0b11;
     ppu.color_3 = (value >> 6) & 0b11;
+}
+
+void lcd_control(uint8_t value) {
+    ppu.bg_window_enable = value & 0x1;
+    ppu.enable_objects = value & 0x2;
+    ppu.large_objects = value & 0x4;
+    ppu.bg_tile_map_location = value & 0x8;
+    ppu.bg_window_tile_data_location = value & 0x10;
+    ppu.window_enable = value & 0x20;
+    ppu.window_tile_map_location = value & 0x40;
+    ppu.ppu_enable = value & 0x80;
 }
 
 static void catch_up_cpu(double cycles_to_add) {
@@ -23,7 +36,7 @@ static void catch_up_cpu(double cycles_to_add) {
                 cpu.state = STOPPED;
                 break;
             }
-            if(cpu.pc == cpu.breakpoint) {
+            if (cpu.pc == cpu.breakpoint) {
                 cpu.state = STOPPED;
                 break;
             }
@@ -31,11 +44,31 @@ static void catch_up_cpu(double cycles_to_add) {
     }
 }
 
+void *framebuffer = NULL;
+
+static uint8_t get_window_tile_index(uint8_t x, uint8_t y) {
+    uint16_t base = ppu.bg_tile_map_location ? 0x9c00 : 0x9800;
+    return read_8(base + 32 * (y / 8) + (x / 8));
+}
+
+static uint8_t get_tile_color(uint8_t tile_index, uint8_t x, uint8_t y) {
+    ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
+    ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
+    uint16_t base = ppu.bg_window_tile_data_location
+                        ? (tile_index < 128 ? 0x8000 : 0x8800)
+                        : (tile_index < 128 ? 0x9000 : 0x8800);
+
+    uint16_t sprite_base_address = base + 16 * tile_index;
+    uint16_t line = read_16(sprite_base_address + y * 2);
+    return ((HIBYTE(line) & (1 << (7 - x))) != 0) +
+           2 * ((LOBYTE(line) & (1 << (7 - x))) != 0);
+}
+
 void ui(void) {
     SetTraceLogLevel(LOG_ERROR);
     SetTargetFPS(60);
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "gb");
-    void *framebuffer = calloc(VIEWPORT_WIDTH * VIEWPORT_HEIGHT * 4, 1);
+    framebuffer = calloc(VIEWPORT_WIDTH * VIEWPORT_HEIGHT * 4, 1);
     Image framebuffer_image = {framebuffer, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 1,
                                PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
     Texture texture = LoadTextureFromImage(framebuffer_image);
@@ -47,19 +80,51 @@ void ui(void) {
         BeginDrawing();
         ClearBackground(BLACK);
 
-        for (uint8_t y = 0; y < 144; y++) {
+        for (uint8_t y = 0; y < VIEWPORT_HEIGHT; y++) {
+            ppu.ly = y;
             ppu.mode = 2;
             catch_up_cpu(80 * CYCLES_PER_DOT);
 
             ppu.mode = 3;
             catch_up_cpu(172 * CYCLES_PER_DOT);
 
+            // background drawing
+            for (uint8_t x = 0; x < VIEWPORT_WIDTH; x++) {
+                uint8_t tile_index =
+                    get_window_tile_index(x + ppu.scroll_x, y + ppu.scroll_y);
+                uint8_t pixel = get_tile_color(
+                    tile_index, (x + ppu.scroll_x) % 8, (y + ppu.scroll_y) % 8);
+                switch (pixel) {
+                case 0:
+                    ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y] =
+                        colors[ppu.color_0];
+                    break;
+                case 1:
+                    ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y] =
+                        colors[ppu.color_1];
+                    break;
+                case 2:
+                    ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y] =
+                        colors[ppu.color_2];
+                    break;
+                case 3:
+                    ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y] =
+                        colors[ppu.color_3];
+                    break;
+                default:
+                    UNREACHABLE_SWITCH(pixel);
+                }
+            }
+
             ppu.mode = 0;
             catch_up_cpu(204 * CYCLES_PER_DOT);
         }
 
         ppu.mode = 1;
-        catch_up_cpu(4560 * CYCLES_PER_DOT);
+        for (uint8_t i = 0; i < 10; i++) {
+            ppu.ly = 144 + i;
+            catch_up_cpu(456 * CYCLES_PER_DOT);
+        }
 
         UpdateTexture(texture, framebuffer);
         DrawTexturePro(texture,
@@ -78,6 +143,9 @@ void ui(void) {
         EndDrawing();
     }
 
+    UnloadTexture(texture);
+    UnloadImage(framebuffer_image);
+    free(framebuffer);
     cpp_end();
     CloseWindow();
 }
