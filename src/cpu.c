@@ -2,6 +2,22 @@
 #include "cpu_mmu.h"
 #include "types.h"
 
+uint8_t cycle_lookup[] = {
+    1, 3, 2, 2, 1, 1, 2, 1, 5, 2, 2, 2, 1, 1, 2, 1, 1, 3, 2, 2, 1, 1, 2, 1,
+    3, 2, 2, 2, 1, 1, 2, 1, 2, 3, 2, 2, 1, 1, 2, 1, 2, 2, 2, 2, 1, 1, 2, 1,
+    2, 3, 2, 2, 3, 3, 3, 1, 2, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1,
+    1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1,
+    1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 2, 2, 2, 2, 1, 2,
+    1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1,
+    1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1,
+    1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1,
+    2, 3, 3, 4, 3, 4, 2, 4, 2, 4, 3, 1, 3, 6, 2, 4, 2, 3, 3, 0, 3, 4, 2, 4,
+    2, 4, 3, 0, 3, 0, 2, 4, 3, 3, 2, 0, 0, 4, 2, 4, 4, 1, 4, 0, 0, 0, 2, 4,
+    3, 3, 2, 1, 0, 4, 2, 4, 3, 2, 4, 1, 0, 0, 2, 4,
+};
+
+uint8_t extended_lookup[] = {2, 2, 2, 2, 2, 2, 4, 2};
+
 extern cpu_t cpu;
 
 // local helper functions
@@ -188,8 +204,10 @@ static void r16mem_write(r16_mem_t dst, uint8_t val) {
 
 void execute(void) {
     uint8_t opcode = next_8();
+    cpu.remaining_cycles -= cycle_lookup[opcode];
     if (opcode == 0xcb) {
         opcode = next_8();
+        cpu.remaining_cycles -= extended_lookup[opcode % 8];
         if ((opcode >> 6) == 0) {
             switch ((opcode >> 3) & 0b111) {
             case 0:
@@ -223,7 +241,6 @@ void execute(void) {
                 bool result =
                     r8_read(opcode & 0b111) & (1 << ((opcode >> 3) & 0b111));
                 set_status_bit(Z_STATUS, !result);
-                printf("0x%04x\n", TO_U16(cpu.l, cpu.h));
                 set_status_bit(N_STATUS, false);
                 set_status_bit(H_STATUS, true);
                 break;
@@ -302,7 +319,7 @@ void execute(void) {
                     TODO("dec r8");
                     break;
                 case 2:
-                    TODO("ld r8, imm8");
+                    r8_write((opcode >> 3) & 0b111, next_8());
                     break;
                 default:
                     UNREACHABLE_SWITCH(opcode & 0b11);

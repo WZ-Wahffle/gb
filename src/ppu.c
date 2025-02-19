@@ -1,7 +1,16 @@
 #include "ppu.h"
 #include "cpu.h"
-#include "raylib.h"
 #include "types.h"
+
+extern cpu_t cpu;
+extern ppu_t ppu;
+
+static void catch_up_cpu(double cycles_to_add) {
+    cpu.remaining_cycles += cycles_to_add;
+    while(cpu.remaining_cycles > 0) {
+        execute();
+    }
+}
 
 void ui(void) {
     SetTraceLogLevel(LOG_ERROR);
@@ -15,7 +24,19 @@ void ui(void) {
         BeginDrawing();
         ClearBackground(BLACK);
 
-        execute();
+        for(uint8_t y = 0; y < 144; y++) {
+            ppu.mode = 2;
+            catch_up_cpu(80 * CYCLES_PER_DOT);
+
+            ppu.mode = 3;
+            catch_up_cpu(172 * CYCLES_PER_DOT);
+
+            ppu.mode = 0;
+            catch_up_cpu(204 * CYCLES_PER_DOT);
+        }
+
+        ppu.mode = 1;
+        catch_up_cpu(4560 * CYCLES_PER_DOT);
 
         UpdateTexture(texture, framebuffer);
         DrawTexturePro(texture,
