@@ -384,9 +384,17 @@ void execute(void) {
                     r16_write((opcode >> 4) & 0b11,
                               r16_read((opcode >> 4) & 0b11) + 1);
                     break;
-                case 9:
-                    TODO("add hl, r16");
+                case 9: {
+                    uint16_t operand = r16_read((opcode >> 4) & 0b11);
+                    uint16_t result = r16_read(HL) + operand;
+                    set_status_bit(N_STATUS, false);
+                    set_status_bit(H_STATUS,
+                                   (r16_read(HL) & 0xfff) + (operand & 0xfff) >
+                                       0xfff);
+                    set_status_bit(C_STATUS, r16_read(HL) + operand > 0xffff);
+                    r16_write(HL, result);
                     break;
+                }
                 case 10:
                     cpu.a = r16mem_read((opcode >> 4) & 0b11);
                     break;
@@ -523,7 +531,7 @@ void execute(void) {
             else if (opcode == 0b11000011)
                 cpu.pc = next_16();
             else if (opcode == 0b11101001)
-                TODO("jp hl");
+                cpu.pc = r16_read(HL);
             else if (opcode == 0b11001101)
                 call(next_16());
             else if (opcode == 0b11100010)
@@ -537,7 +545,7 @@ void execute(void) {
             else if (opcode == 0b11110000)
                 cpu.a = read_8(0xff00 + next_8());
             else if (opcode == 0b11111010)
-                TODO("ld a, [imm16]");
+                cpu.a = read_8(read_16(next_16()));
             else if (opcode == 0b11101000)
                 TODO("add sp, imm8");
             else if (opcode == 0b11111000)
@@ -556,9 +564,14 @@ void execute(void) {
                 case 1:
                     r16stk_write((opcode >> 4) & 0b11, pop_16());
                     break;
-                case 2:
-                    TODO("jp cond, imm16");
+                case 2: {
+                    if(resolve_cond((opcode >> 3) & 0b11)) {
+                        cpu.pc = next_16();
+                    } else {
+                        next_16();
+                    }
                     break;
+                }
                 case 4:
                     TODO("call cond, imm16");
                     break;

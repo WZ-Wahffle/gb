@@ -55,20 +55,30 @@ uint8_t mmu_read(uint16_t addr) {
         switch (addr) {
         case 0xff00:
             if (!ppu.select_dpad) {
-                return ((!ppu.right) << 0) | ((!ppu.left) << 1) | ((!ppu.up) << 2) |
-                       ((!ppu.down) << 3) | (ppu.select_dpad << 4) |
-                       (ppu.select_buttons << 5);
+                return ((!ppu.right) << 0) | ((!ppu.left) << 1) |
+                       ((!ppu.up) << 2) | ((!ppu.down) << 3) |
+                       (ppu.select_dpad << 4) | (ppu.select_buttons << 5);
             }
             if (!ppu.select_buttons) {
-                return ((!ppu.a) << 0) | ((!ppu.b) << 1) | ((!ppu.select) << 2) |
-                       ((!ppu.start) << 3) | (ppu.select_dpad << 4) |
-                       (ppu.select_buttons << 5);
+                return ((!ppu.a) << 0) | ((!ppu.b) << 1) |
+                       ((!ppu.select) << 2) | ((!ppu.start) << 3) |
+                       (ppu.select_dpad << 4) | (ppu.select_buttons << 5);
             }
             return 0xf | (ppu.select_dpad << 4) | (ppu.select_buttons << 5);
+        case 0xff40:
+            return (ppu.bg_window_enable << 0) | (ppu.enable_objects << 1) |
+                   (ppu.large_objects << 2) | (ppu.bg_tile_map_location << 3) |
+                   (ppu.bg_window_tile_data_location << 4) |
+                   (ppu.window_enable << 5) |
+                   (ppu.window_tile_map_location << 6) | (ppu.ppu_enable << 7);
         case 0xff42:
             return ppu.scroll_y;
         case 0xff44:
             return ppu.ly;
+        case 0xffff:
+            return (cpu.memory.vblank_ie << 0) | (cpu.memory.lcd_ie << 1) |
+                   (cpu.memory.timer_ie << 2) | (cpu.memory.serial_ie << 3) |
+                   (cpu.memory.joypad_ie << 4);
         default:
             UNREACHABLE_SWITCH(addr);
         }
