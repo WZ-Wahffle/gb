@@ -295,9 +295,17 @@ void execute(void) {
             case 5:
                 TODO("sra r8");
                 break;
-            case 6:
-                TODO("swap r8");
+            case 6: {
+                uint8_t operand = r8_read(opcode & 0b111);
+                uint8_t result =
+                    ((operand & 0xf0) >> 4) | ((operand & 0x0f) << 4);
+                set_status_bit(Z_STATUS, result == 0);
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, false);
+                set_status_bit(C_STATUS, false);
+                r8_write(opcode & 0b111, result);
                 break;
+            }
             case 7:
                 TODO("srl r8");
                 break;
@@ -327,9 +335,9 @@ void execute(void) {
     } else
         switch (opcode >> 6) {
         case 0:
-            if (opcode == 0b00000000)
-                TODO("nop");
-            else if (opcode == 0b00000111)
+            if (opcode == 0b00000000) {
+                // this page intentionally left blank
+            } else if (opcode == 0b00000111)
                 TODO("rlca");
             else if (opcode == 0b00001000)
                 TODO("ld [imm16], sp");
@@ -351,9 +359,11 @@ void execute(void) {
                 TODO("rra");
             else if (opcode == 0b00100111)
                 TODO("daa");
-            else if (opcode == 0b00101111)
-                TODO("cpl");
-            else if (opcode == 0b00110111)
+            else if (opcode == 0b00101111) {
+                cpu.a = ~cpu.a;
+                set_status_bit(N_STATUS, true);
+                set_status_bit(H_STATUS, true);
+            } else if (opcode == 0b00110111)
                 TODO("scf");
             else if (opcode == 0b00111111)
                 TODO("ccf");
@@ -420,9 +430,16 @@ void execute(void) {
             break;
         case 2:
             switch ((opcode >> 3) & 0b111) {
-            case 0:
-                TODO("add a, r8");
+            case 0: {
+                uint8_t operand = r8_read(opcode & 0b111);
+                uint8_t result = cpu.a + operand;
+                set_status_bit(Z_STATUS, result == 0);
+                set_status_bit(N_STATUS, true);
+                set_status_bit(H_STATUS, (operand & 0xf) + (cpu.a & 0xf) > 0xf);
+                set_status_bit(C_STATUS, operand + cpu.a > 0xff);
+                cpu.a = result;
                 break;
+            }
             case 1:
                 TODO("adc a, r8");
                 break;
@@ -439,9 +456,14 @@ void execute(void) {
             case 3:
                 TODO("sbc a, r8");
                 break;
-            case 4:
-                TODO("and a, r8");
+            case 4: {
+                cpu.a &= r8_read(opcode & 0b111);
+                set_status_bit(Z_STATUS, cpu.a == 0);
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, true);
+                set_status_bit(C_STATUS, false);
                 break;
+            }
             case 5: {
                 cpu.a ^= r8_read(opcode & 0b111);
                 set_status_bit(Z_STATUS, cpu.a == 0);
@@ -451,11 +473,21 @@ void execute(void) {
                 break;
             }
             case 6:
-                TODO("or a, r8");
+                cpu.a |= r8_read(opcode & 0b111);
+                set_status_bit(Z_STATUS, cpu.a == 0);
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, false);
+                set_status_bit(C_STATUS, false);
                 break;
-            case 7:
-                TODO("cp a, r8");
+            case 7: {
+                uint8_t operand = r8_read(opcode & 0b111);
+                uint8_t result = cpu.a - operand;
+                set_status_bit(Z_STATUS, result == 0);
+                set_status_bit(N_STATUS, true);
+                set_status_bit(H_STATUS, (operand & 0xf) > (cpu.a & 0xf));
+                set_status_bit(C_STATUS, operand > cpu.a);
                 break;
+            }
             }
             break;
         case 3:
@@ -467,9 +499,13 @@ void execute(void) {
                 TODO("sub a, imm8");
             else if (opcode == 0b11011110)
                 TODO("sbc a, imm8");
-            else if (opcode == 0b1110010)
-                TODO("and a, imm8");
-            else if (opcode == 0b11101110)
+            else if (opcode == 0b11100110) {
+                cpu.a &= next_8();
+                set_status_bit(Z_STATUS, cpu.a == 0);
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, true);
+                set_status_bit(C_STATUS, false);
+            } else if (opcode == 0b11101110)
                 TODO("xor a, imm8");
             else if (opcode == 0b11110110)
                 TODO("or a, imm8");
@@ -485,7 +521,7 @@ void execute(void) {
             else if (opcode == 0b11011001)
                 TODO("reti");
             else if (opcode == 0b11000011)
-                TODO("jp imm16");
+                cpu.pc = next_16();
             else if (opcode == 0b11101001)
                 TODO("jp hl");
             else if (opcode == 0b11001101)
@@ -509,9 +545,9 @@ void execute(void) {
             else if (opcode == 0b11111001)
                 TODO("ld sp, hl");
             else if (opcode == 0b11110011)
-                TODO("di");
+                cpu.ime = false;
             else if (opcode == 0b11111011)
-                TODO("ei");
+                cpu.ime = true;
             else
                 switch (opcode & 0b111) {
                 case 0:
@@ -530,7 +566,7 @@ void execute(void) {
                     push_16(r16stk_read((opcode >> 4) & 0b11));
                     break;
                 case 7:
-                    TODO("rst tgt3");
+                    call(8 * ((opcode >> 3) & 0b111));
                     break;
                 default:
                     UNREACHABLE_SWITCH(opcode);
@@ -539,4 +575,33 @@ void execute(void) {
         default:
             UNREACHABLE_SWITCH(opcode >> 6);
         }
+}
+
+void check_interrupts(void) {
+    if (cpu.ime) {
+        uint8_t vector = 0;
+        if (cpu.memory.vblank_ie && cpu.memory.vblank_if) {
+            cpu.memory.vblank_if = false;
+            vector = 0x40;
+        } else if (cpu.memory.lcd_ie && cpu.memory.lcd_if) {
+            cpu.memory.lcd_if = false;
+            vector = 0x48;
+        } else if (cpu.memory.timer_ie && cpu.memory.timer_if) {
+            cpu.memory.timer_if = false;
+            vector = 0x50;
+        } else if (cpu.memory.serial_ie && cpu.memory.serial_if) {
+            cpu.memory.serial_if = false;
+            vector = 0x58;
+        } else if (cpu.memory.joypad_ie && cpu.memory.joypad_if) {
+            cpu.memory.joypad_if = false;
+            vector = 0x60;
+        }
+
+        if (vector != 0) {
+            cpu.ime = false;
+            push_16(cpu.pc);
+            cpu.pc = vector;
+            cpu.remaining_cycles -= 20;
+        }
+    }
 }

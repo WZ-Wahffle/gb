@@ -379,20 +379,33 @@ void cpp_imgui_render(void) {
             ImGui::Text("Period high: %d", apu.ch1.period_high);
             ImGui::Text("Frequency: %d Hz", apu.ch1.frequency);
             ImGui::Text("Volume: %0.4f", apu.ch1.volume / 15.f);
-            ImGui::Text("Envelope initial: %d", apu.ch1.envelope_initial_volume);
+            ImGui::Text("Envelope initial: %d",
+                        apu.ch1.envelope_initial_volume);
             ImGui::Text("Envelope pace: %d", apu.ch1.envelope_pace);
-            ImGui::Text("Envelope direction: %s", apu.ch1.envelope_dir ? "INC" : "DEC");
+            ImGui::Text("Envelope direction: %s",
+                        apu.ch1.envelope_dir ? "INC" : "DEC");
             ImGui::EndTabItem();
         }
-        if(ImGui::BeginTabItem("2")) {
+        if (ImGui::BeginTabItem("2")) {
             ImGui::Text("Enabled: %s", apu.ch2.enable ? "true" : "false");
             ImGui::Text("Period low: %d", apu.ch2.period_low);
             ImGui::Text("Period high: %d", apu.ch2.period_high);
             ImGui::Text("Frequency: %d Hz", apu.ch2.frequency);
             ImGui::Text("Volume: %0.4f", apu.ch2.volume / 15.f);
+            ImGui::Text("Envelope initial: %d",
+                        apu.ch2.envelope_initial_volume);
+            ImGui::Text("Envelope pace: %d", apu.ch2.envelope_pace);
+            ImGui::Text("Envelope direction: %s",
+                        apu.ch2.envelope_dir ? "INC" : "DEC");
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
+    }
+
+    if (ImGui::CollapsingHeader("Input")) {
+        ImGui::Text("UDLR ABSs");
+        ImGui::Text("%d%d%d%d %d%d%d%d", ppu.up, ppu.down, ppu.left, ppu.right,
+                    ppu.a, ppu.b, ppu.start, ppu.select);
     }
 
     ImGui::End();

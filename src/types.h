@@ -65,6 +65,13 @@ typedef struct {
     uint8_t wram[0x2000];
     uint8_t hram[0x7f];
     oam_t oam[40];
+    bool vblank_ie, vblank_if;
+    bool lcd_ie, lcd_if;
+    bool timer_ie, timer_if;
+    bool serial_ie, serial_if;
+    bool joypad_ie, joypad_if;
+    uint8_t timer_counter, timer_modulo, timer_clock_select;
+    bool timer_enable;
 } cpu_mmu_t;
 
 typedef struct {
@@ -75,11 +82,14 @@ typedef struct {
     uint8_t opcode;
     state_t state;
     uint16_t breakpoint;
+    bool ime;
 } cpu_t;
 
 typedef struct {
     uint8_t mode;
-    uint8_t color_0, color_1, color_2, color_3;
+    uint8_t bg_color[4];
+    uint8_t obj_color_1[4];
+    uint8_t obj_color_2[4];
     uint8_t scroll_x, scroll_y;
     bool ppu_enable;
     bool window_tile_map_location;
@@ -90,6 +100,11 @@ typedef struct {
     bool enable_objects;
     bool bg_window_enable;
     uint8_t ly;
+    uint8_t lyc;
+    bool lyc_int, mode_2_int, mode_1_int, mode_0_int;
+    uint8_t wx, wy;
+    bool select_buttons, select_dpad;
+    bool a, b, start, select, up, down, left, right;
 } ppu_t;
 
 typedef struct {
@@ -145,15 +160,17 @@ typedef struct {
     bool pan_right;
     bool enable;
 
-    uint8_t intitial_length_timer;
+    uint8_t initial_length_timer;
 
     uint8_t envelope_initial_volume;
     bool envelope_dir;
     uint8_t envelope_pace;
+    uint8_t volume;
 
     uint8_t clock_shift;
     bool narrow_lfsr;
     uint8_t clock_divider;
+    uint16_t lfsr;
 
     bool length_enable;
     bool trigger;

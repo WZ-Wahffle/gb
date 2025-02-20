@@ -17,7 +17,7 @@ uint8_t nocart_read(uint16_t addr) {
 }
 
 void nocart_write(uint16_t addr, uint8_t value) {
-    ASSERT(0, "Attempting to write 0x%02x to cart at address 0x%04x!\n", value, addr);
+    printf("Attempting to write 0x%02x to cart at address 0x%04x\n", value, addr);
 }
 
 void nocart_free(void) {

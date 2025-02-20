@@ -11,6 +11,7 @@
 #endif
 
 void execute(void);
+void check_interrupts(void);
 EXTERNC uint8_t read_8(uint16_t addr);
 EXTERNC uint16_t read_16(uint16_t addr);
 

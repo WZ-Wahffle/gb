@@ -5,6 +5,7 @@
 
 extern cpu_t cpu;
 extern ppu_t ppu;
+extern apu_t apu;
 
 static uint8_t boot_rom[] = {
     0x31, 0xfe, 0xff, 0xaf, 0x21, 0xff, 0x9f, 0x32, 0xcb, 0x7c, 0x20, 0xfb,
@@ -52,6 +53,18 @@ uint8_t mmu_read(uint16_t addr) {
         return cpu.memory.hram[addr - 0xff80];
     } else {
         switch (addr) {
+        case 0xff00:
+            if (!ppu.select_dpad) {
+                return ((!ppu.right) << 0) | ((!ppu.left) << 1) | ((!ppu.up) << 2) |
+                       ((!ppu.down) << 3) | (ppu.select_dpad << 4) |
+                       (ppu.select_buttons << 5);
+            }
+            if (!ppu.select_buttons) {
+                return ((!ppu.a) << 0) | ((!ppu.b) << 1) | ((!ppu.select) << 2) |
+                       ((!ppu.start) << 3) | (ppu.select_dpad << 4) |
+                       (ppu.select_buttons << 5);
+            }
+            return 0xf | (ppu.select_dpad << 4) | (ppu.select_buttons << 5);
         case 0xff42:
             return ppu.scroll_y;
         case 0xff44:
@@ -78,11 +91,35 @@ void mmu_write(uint16_t addr, uint8_t value) {
     } else if (addr < 0xfea0) {
         ((uint8_t *)cpu.memory.oam)[addr - 0xfe00] = value;
     } else if (addr < 0xff00) {
-        ASSERT(0, "Write of 0x%02x to 0x%04x, Nintendo says no\n", value, addr);
+        // this page intentionally left blank
     } else if (addr >= 0xff80 && addr < 0xffff) {
         cpu.memory.hram[addr - 0xff80] = value;
     } else {
         switch (addr) {
+        case 0xff00:
+            ppu.select_dpad = value & 0x10;
+            ppu.select_buttons = value & 0x20;
+            break;
+        case 0xff01:
+            printf("TODO: Serial transfer data\n");
+            break;
+        case 0xff02:
+            printf("TODO: Serial transfer control\n");
+            break;
+        case 0xff06:
+            cpu.memory.timer_modulo = value;
+            break;
+        case 0xff07:
+            cpu.memory.timer_clock_select = value & 0b11;
+            cpu.memory.timer_enable = value & 0x4;
+            break;
+        case 0xff0f:
+            cpu.memory.vblank_if = value & 0x1;
+            cpu.memory.lcd_if = value & 0x2;
+            cpu.memory.timer_if = value & 0x4;
+            cpu.memory.serial_if = value & 0x8;
+            cpu.memory.joypad_if = value & 0x10;
+            break;
         case 0xff10:
             ch1_sweep(value);
             break;
@@ -98,6 +135,33 @@ void mmu_write(uint16_t addr, uint8_t value) {
         case 0xff14:
             ch1_period_high_control(value);
             break;
+        case 0xff16:
+            ch2_length_timer_duty_cycle(value);
+            break;
+        case 0xff17:
+            ch2_volume_envelope(value);
+            break;
+        case 0xff18:
+            ch2_period_low(value);
+            break;
+        case 0xff19:
+            ch2_period_high_control(value);
+            break;
+        case 0xff1a:
+            apu.ch3.enable = false;
+            break;
+        case 0xff20:
+            ch4_length_timer(value);
+            break;
+        case 0xff21:
+            ch4_volume_envelope(value);
+            break;
+        case 0xff22:
+            ch4_frequency_randomness(value);
+            break;
+        case 0xff23:
+            ch4_control(value);
+            break;
         case 0xff24:
             master_volume_vin_panning(value);
             break;
@@ -110,6 +174,9 @@ void mmu_write(uint16_t addr, uint8_t value) {
         case 0xff40:
             lcd_control(value);
             break;
+        case 0xff41:
+            lcd_status_write(value);
+            break;
         case 0xff42:
             ppu.scroll_y = value;
             break;
@@ -117,7 +184,32 @@ void mmu_write(uint16_t addr, uint8_t value) {
             ppu.scroll_x = value;
             break;
         case 0xff47:
-            set_palette(value);
+            set_bg_palette(value);
+            break;
+        case 0xff48:
+            set_obj_palette_1(value);
+            break;
+        case 0xff49:
+            set_obj_palette_2(value);
+            break;
+        case 0xff4a:
+            ppu.wy = value;
+            break;
+        case 0xff4b:
+            ppu.wx = value;
+            break;
+        case 0xff50:
+            booting = false;
+            break;
+        case 0xff7f:
+            // this page intentionally left blank
+            break;
+        case 0xffff:
+            cpu.memory.vblank_ie = value & 0x1;
+            cpu.memory.lcd_ie = value & 0x2;
+            cpu.memory.timer_ie = value & 0x4;
+            cpu.memory.serial_ie = value & 0x8;
+            cpu.memory.joypad_ie = value & 0x10;
             break;
         default:
             UNREACHABLE_SWITCH(addr);
