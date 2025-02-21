@@ -315,6 +315,7 @@ extern "C" {
 void cpp_init(void) { rlImGuiSetup(true); }
 
 static char bp_inter[5] = {0};
+static int32_t wram_page = 0;
 
 void cpp_imgui_render(void) {
     rlImGuiBegin();
@@ -371,6 +372,30 @@ void cpp_imgui_render(void) {
         cpu.breakpoint = strtoul(bp_inter, NULL, 16);
     }
 
+    if (ImGui::CollapsingHeader("CPU")) {
+        ImGui::Text("A: 0x%02x", cpu.a);
+        ImGui::SameLine();
+        ImGui::Text("B: 0x%02x", cpu.b);
+        ImGui::SameLine();
+        ImGui::Text("C: 0x%02x", cpu.c);
+        ImGui::SameLine();
+        ImGui::Text("D: 0x%02x", cpu.d);
+        ImGui::Text("E: 0x%02x", cpu.e);
+        ImGui::SameLine();
+        ImGui::Text("H: 0x%02x", cpu.h);
+        ImGui::SameLine();
+        ImGui::Text("L: 0x%02x", cpu.l);
+        ImGui::SameLine();
+        ImGui::Text("SP: 0x%04x", cpu.sp);
+        ImGui::NewLine();
+        ImGui::Text("IME %d  EF", cpu.ime);
+        ImGui::Text("VBlank %d%d", cpu.memory.vblank_ie, cpu.memory.vblank_if);
+        ImGui::Text("LCD    %d%d", cpu.memory.lcd_ie, cpu.memory.lcd_if);
+        ImGui::Text("Timer  %d%d", cpu.memory.timer_ie, cpu.memory.timer_if);
+        ImGui::Text("Serial %d%d", cpu.memory.serial_ie, cpu.memory.serial_if);
+        ImGui::Text("Joypad %d%d", cpu.memory.joypad_ie, cpu.memory.joypad_if);
+    }
+
     if (ImGui::CollapsingHeader("APU")) {
         ImGui::BeginTabBar("Channels");
         if (ImGui::BeginTabItem("1")) {
@@ -406,6 +431,50 @@ void cpp_imgui_render(void) {
         ImGui::Text("UDLR ABSs");
         ImGui::Text("%d%d%d%d %d%d%d%d", ppu.up, ppu.down, ppu.left, ppu.right,
                     ppu.a, ppu.b, ppu.start, ppu.select);
+    }
+
+    if (ImGui::CollapsingHeader("WRAM")) {
+        ImGui::InputInt("Page", &wram_page);
+        if (wram_page < 0)
+            wram_page = 0;
+        if (wram_page > 31)
+            wram_page = 31;
+        ImGui::BeginTable("##pages", 8,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg);
+        for (uint8_t i = 0; i < 32; i++) {
+            for (uint8_t j = 0; j < 8; j++) {
+                ImGui::TableNextColumn();
+                ImGui::Text("0x%02x",
+                            read_8(0xc000 + wram_page * 256 + i * 8 + j));
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("0x%02x",
+                                      0xc000 + wram_page * 256 + i * 8 + j);
+                }
+            }
+            if (i != 31)
+                ImGui::TableNextRow();
+        }
+        ImGui::EndTable();
+    }
+
+    if (ImGui::CollapsingHeader("HRAM")) {
+        ImGui::BeginTable("##pages", 8,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg);
+        for (uint8_t i = 0; i < 16; i++) {
+            for (uint8_t j = 0; j < 8; j++) {
+                if(i * 8 + j == 127) break;
+                ImGui::TableNextColumn();
+                ImGui::Text("0x%02x",
+                            read_8(0xff80 + i * 8 + j));
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("0x%02x",
+                                      0xff80 + i * 8 + j);
+                }
+            }
+            if (i != 31)
+                ImGui::TableNextRow();
+        }
+        ImGui::EndTable();
     }
 
     ImGui::End();

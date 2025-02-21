@@ -1,5 +1,6 @@
 #include "cpu_mmu.h"
 #include "apu.h"
+#include "cpu.h"
 #include "ppu.h"
 #include "types.h"
 
@@ -193,6 +194,15 @@ void mmu_write(uint16_t addr, uint8_t value) {
         case 0xff43:
             ppu.scroll_x = value;
             break;
+        case 0xff46: {
+            uint16_t start = value * 0x100;
+            for (uint8_t i = 0; i < 40; i++) {
+                cpu.memory.oam[i].y = read_8(start + i * 4 + 0);
+                cpu.memory.oam[i].x = read_8(start + i * 4 + 1);
+                cpu.memory.oam[i].tile = read_8(start + i * 4 + 2);
+                cpu.memory.oam[i].attr = read_8(start + i * 4 + 3);
+            }
+        } break;
         case 0xff47:
             set_bg_palette(value);
             break;

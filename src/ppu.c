@@ -53,6 +53,7 @@ static void catch_up_cpu(double cycles_to_add) {
         cpu.remaining_cycles += cycles_to_add;
         while (cpu.remaining_cycles > 0) {
             execute();
+            check_interrupts();
             if (cpu.state == STEPPED) {
                 cpu.state = STOPPED;
                 break;
