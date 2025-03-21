@@ -48,12 +48,27 @@ void lcd_status_write(uint8_t value) {
     ppu.lyc_int = value & 0x40;
 }
 
+static void try_step_cpu(void) {
+    if (cpu.remaining_cycles > 0) {
+        execute();
+        check_interrupts();
+        if (cpu.pc == cpu.breakpoint) {
+            cpu.state = STOPPED;
+            return;
+        }
+        if (cpu.watch_interrupt) {
+            cpu.watch_interrupt = false;
+            cpu.state = STOPPED;
+            return;
+        }
+    }
+}
+
 static void catch_up_cpu(double cycles_to_add) {
     if (cpu.state == RUNNING || cpu.state == STEPPED) {
         cpu.remaining_cycles += cycles_to_add;
         while (cpu.remaining_cycles > 0) {
-            execute();
-            check_interrupts();
+            try_step_cpu();
             if (cpu.state == STEPPED) {
                 cpu.state = STOPPED;
                 break;
@@ -86,6 +101,61 @@ static uint8_t get_tile_color(uint8_t tile_index, uint8_t x, uint8_t y) {
            2 * ((LOBYTE(line) & (1 << (7 - x))) != 0);
 }
 
+static void set_pixel(uint8_t x, uint8_t y) {
+    uint8_t tile_index =
+        get_window_tile_index(x + ppu.scroll_x, y + ppu.scroll_y);
+    uint8_t pixel = get_tile_color(tile_index, (x + ppu.scroll_x) % 8,
+                                   (y + ppu.scroll_y) % 8);
+
+    ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y] =
+        colors[ppu.bg_color[pixel]];
+}
+
+static void try_step_ppu(void) {
+    if (ppu.remaining_cycles > 0) {
+        ppu.remaining_cycles -= CYCLES_PER_DOT;
+
+        ppu.drawing_x++;
+        if (ppu.drawing_x == 456) {
+            ppu.drawing_x = 0;
+            ppu.drawing_y++;
+            if (ppu.drawing_y == 144) {
+            }
+            if (ppu.drawing_y == 154) {
+                ppu.drawing_y = 0;
+            }
+        }
+
+        if (ppu.drawing_x >= 80 && ppu.drawing_x < 240) {
+            if (ppu.drawing_y < 144)
+                set_pixel(ppu.drawing_x - 80, ppu.drawing_y);
+
+            ppu.ly = ppu.drawing_y;
+            if (ppu.lyc_int && ppu.ly == ppu.lyc)
+                cpu.memory.lcd_if = true;
+        }
+
+        if (ppu.drawing_y > 143) {
+            ppu.mode = 1;
+            cpu.memory.vblank_if = true;
+            if (ppu.mode_1_int)
+                cpu.memory.lcd_if = true;
+        } else {
+            if (ppu.drawing_x < 80) {
+                ppu.mode = 2;
+                if (ppu.mode_2_int)
+                    cpu.memory.lcd_if = true;
+            } else if (ppu.drawing_x < 252) {
+                ppu.mode = 3;
+            } else {
+                ppu.mode = 0;
+                if (ppu.mode_0_int)
+                    cpu.memory.lcd_if = true;
+            }
+        }
+    }
+}
+
 void ui(void) {
     SetTraceLogLevel(LOG_ERROR);
     SetTargetFPS(60);
@@ -96,6 +166,7 @@ void ui(void) {
     Texture texture = LoadTextureFromImage(framebuffer_image);
 
     bool show_debug = false;
+    bool show_electron_beam = false;
 
     cpp_init();
     while (!WindowShouldClose()) {
@@ -111,44 +182,37 @@ void ui(void) {
         ppu.left = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) < -0.5;
         ppu.right = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) > 0.5;
 
-        for (uint8_t y = 0; y < VIEWPORT_HEIGHT; y++) {
-            ppu.ly = y;
-            if (ppu.lyc_int && ppu.ly == ppu.lyc)
-                cpu.memory.lcd_if = true;
-            ppu.mode = 2;
-            if (ppu.mode_2_int)
-                cpu.memory.lcd_if = true;
-            catch_up_cpu(80 * CYCLES_PER_DOT);
-
-            ppu.mode = 3;
-            catch_up_cpu(172 * CYCLES_PER_DOT);
-
-            // background drawing
-            for (uint8_t x = 0; x < VIEWPORT_WIDTH; x++) {
-                uint8_t tile_index =
-                    get_window_tile_index(x + ppu.scroll_x, y + ppu.scroll_y);
-                uint8_t pixel = get_tile_color(
-                    tile_index, (x + ppu.scroll_x) % 8, (y + ppu.scroll_y) % 8);
-
-                ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y] =
-                    colors[ppu.bg_color[pixel]];
+        for (uint32_t i = 0; i < 70224 * PLAYBACK_SPEED; i++) {
+            switch (cpu.state) {
+            case STOPPED:
+                // this page intentionally left blank
+                break;
+            case STEPPED:
+                ppu.remaining_cycles += (-cpu.remaining_cycles) + 1;
+                cpu.remaining_cycles = 1;
+                cpu.state = STOPPED;
+                try_step_cpu();
+                try_step_ppu();
+                break;
+            case RUNNING:
+                cpu.remaining_cycles += CYCLES_PER_DOT;
+                ppu.remaining_cycles += CYCLES_PER_DOT;
+                while (cpu.remaining_cycles > 0 && cpu.state != STOPPED) {
+                    try_step_cpu();
+                }
+                try_step_ppu();
+                break;
             }
-
-            ppu.mode = 0;
-            if (ppu.mode_0_int)
-                cpu.memory.lcd_if = true;
-            catch_up_cpu(204 * CYCLES_PER_DOT);
         }
 
-        cpu.memory.vblank_if = true;
-        ppu.mode = 1;
-        if (ppu.mode_1_int)
-            cpu.memory.lcd_if = true;
-        for (uint8_t i = 0; i < 10; i++) {
-            ppu.ly = 144 + i;
-            if (ppu.lyc_int && ppu.ly == ppu.lyc)
-                cpu.memory.lcd_if = true;
-            catch_up_cpu(456 * CYCLES_PER_DOT);
+        uint32_t old_value;
+        if (show_electron_beam && ppu.drawing_y < 144 && ppu.drawing_x >= 80 &&
+            ppu.drawing_x < 240) {
+            old_value =
+                ((uint32_t *)framebuffer)[ppu.drawing_y * VIEWPORT_WIDTH +
+                                          ppu.drawing_x - 80];
+            ((uint32_t *)framebuffer)[ppu.drawing_y * VIEWPORT_WIDTH +
+                                      ppu.drawing_x - 80] = 0xff0000ff;
         }
 
         UpdateTexture(texture, framebuffer);
@@ -157,8 +221,18 @@ void ui(void) {
                        (Rectangle){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT},
                        (Vector2){0, 0}, 0.f, WHITE);
 
+        if (show_electron_beam && ppu.drawing_y < 144 && ppu.drawing_x >= 80 &&
+            ppu.drawing_x < 240) {
+            ((uint32_t *)framebuffer)[ppu.drawing_y * VIEWPORT_WIDTH +
+                                      ppu.drawing_x - 80] = old_value;
+        }
+
         if (IsKeyPressed(KEY_TAB)) {
             show_debug = !show_debug;
+        }
+
+        if (IsKeyPressed(KEY_LEFT_ALT)) {
+            show_electron_beam = !show_electron_beam;
         }
 
         if (show_debug) {

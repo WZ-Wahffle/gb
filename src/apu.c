@@ -12,7 +12,7 @@ static int8_t duty_cycles[4][8] = {{-1, -1, -1, -1, -1, -1, -1, 1},
                                    {-1, -1, 1, 1, 1, 1, 1, 1}};
 
 static float square_wave(float x, duty_cycle_t dc) {
-    ASSERT(x < 2 * PI, "Square wave call outside of allowed range, found %f",
+    ASSERT(x <= 2 * PI, "Square wave call outside of allowed range, found %f",
            x);
     return duty_cycles[dc][((uint8_t)floor(x / (PI / 4)) % 8)];
 }

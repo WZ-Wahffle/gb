@@ -51,7 +51,7 @@ static bool resolve_cond(cond_t cond) {
 
 uint8_t read_8(uint16_t addr) { return mmu_read(addr); }
 
-static void write_8(uint16_t addr, uint8_t val) { return mmu_write(addr, val); }
+void write_8(uint16_t addr, uint8_t val) { return mmu_write(addr, val); }
 
 uint16_t read_16(uint16_t addr) {
     return TO_U16(read_8(addr), read_8(addr + 1));
@@ -263,6 +263,11 @@ void execute(void) {
     cpu.opcode = next_8();
     uint8_t opcode = cpu.opcode;
     cpu.remaining_cycles -= cycle_lookup[opcode] * 4;
+
+    cpu.prev_opcode[cpu.prev_idx] = opcode;
+    cpu.prev_pc[cpu.prev_idx] = cpu.pc-1;
+    cpu.prev_idx++;
+
     if (cpu.opcode == 0xcb) {
         cpu.opcode = next_8();
         opcode = cpu.opcode;
@@ -270,12 +275,15 @@ void execute(void) {
         if ((opcode >> 6) == 0) {
             switch ((opcode >> 3) & 0b111) {
             case 0:
+                // rlc r8
                 TODO("rlc r8");
                 break;
             case 1:
+                // rrc r8
                 TODO("rrc r8");
                 break;
             case 2: {
+                // rl r8
                 uint8_t result = r8_read(opcode & 0b111) * 2 +
                                  (get_status_bit(C_STATUS) ? 1 : 0);
 
@@ -287,6 +295,7 @@ void execute(void) {
                 break;
             }
             case 3: {
+                // rr r8
                 uint8_t result = r8_read(opcode & 0b111) / 2 +
                                  (get_status_bit(C_STATUS) ? 0x80 : 0);
                 set_status_bit(Z_STATUS, result == 0);
@@ -296,12 +305,15 @@ void execute(void) {
                 r8_write(opcode & 0b111, result);
             } break;
             case 4:
+                // sla r8
                 TODO("sla r8");
                 break;
             case 5:
+                // sra r8
                 TODO("sra r8");
                 break;
             case 6: {
+                // swap r8
                 uint8_t operand = r8_read(opcode & 0b111);
                 uint8_t result =
                     ((operand & 0xf0) >> 4) | ((operand & 0x0f) << 4);
@@ -313,6 +325,7 @@ void execute(void) {
                 break;
             }
             case 7: {
+                // srl r8
                 uint8_t operand = r8_read(opcode & 0b111);
                 set_status_bit(Z_STATUS, (operand >> 1) == 0);
                 set_status_bit(H_STATUS, false);
@@ -579,8 +592,8 @@ void execute(void) {
                 uint8_t result = cpu.a - operand;
                 set_status_bit(Z_STATUS, result == 0);
                 set_status_bit(N_STATUS, true);
-                set_status_bit(H_STATUS, (operand & 0xf) > (cpu.a & 0xf));
-                set_status_bit(C_STATUS, cpu.a > result);
+                set_status_bit(H_STATUS, (operand & 0xf) < (cpu.a & 0xf));
+                set_status_bit(C_STATUS, cpu.a < result);
             } else if (opcode == 0b11001001)
                 ret();
             else if (opcode == 0b11011001) {
@@ -606,9 +619,15 @@ void execute(void) {
                 cpu.a = read_8(read_16(next_16()));
             else if (opcode == 0b11101000)
                 TODO("add sp, imm8");
-            else if (opcode == 0b11111000)
-                TODO("ld hl, sp + imm8");
-            else if (opcode == 0b11111001)
+            else if (opcode == 0b11111000) {
+                int16_t operand = (int8_t)next_8();
+                uint16_t result = cpu.sp + operand;
+                set_status_bit(Z_STATUS, false);
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, (cpu.sp & 0xfff) + (operand & 0xfff) > 0xfff);
+                set_status_bit(C_STATUS, cpu.sp + operand > 0xffff);
+                r16_write(HL, result);
+            } else if (opcode == 0b11111001)
                 TODO("ld sp, hl");
             else if (opcode == 0b11110011)
                 cpu.ime = false;

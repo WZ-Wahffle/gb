@@ -1,3 +1,4 @@
+#include <vector>
 #define NO_FONT_AWESOME
 #include "cpu.h"
 #include "imgui.h"
@@ -312,10 +313,16 @@ extern ppu_t ppu;
 extern apu_t apu;
 
 extern "C" {
-void cpp_init(void) { rlImGuiSetup(true); }
 
 static char bp_inter[5] = {0};
 static int32_t wram_page = 0;
+static int32_t rom_page = 0;
+static uint16_t poke_location = 0;
+static uint8_t poke_value = 0;
+
+void cpp_init(void) {
+    rlImGuiSetup(true);
+}
 
 void cpp_imgui_render(void) {
     rlImGuiBegin();
@@ -372,20 +379,47 @@ void cpp_imgui_render(void) {
         cpu.breakpoint = strtoul(bp_inter, NULL, 16);
     }
 
+    ImGui::Text("Location: 0x");
+    ImGui::SameLine();
+    ImGui::PushItemWidth(2.5 * ImGui::GetFontSize());
+    ImGui::InputScalar("##pokeloc", ImGuiDataType_U16, &poke_location, NULL, NULL,
+                       "%04x");
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    ImGui::Text("Value: 0x");
+    ImGui::PushItemWidth(1.5 * ImGui::GetFontSize());
+    ImGui::SameLine();
+    ImGui::InputScalar("##pokeval", ImGuiDataType_U8, &poke_value, NULL, NULL, "%02x");
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    if(ImGui::Button("Poke")) {
+        write_8(poke_location, poke_value);
+    }
+
+    ImGui::Text("Memory watchpoint: 0x");
+    ImGui::SameLine();
+    ImGui::PushItemWidth(2.5 * ImGui::GetFontSize());
+    ImGui::InputScalar("##watchloc", ImGuiDataType_U16, &cpu.watch_addr, NULL, NULL, "%04x");
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    if(ImGui::Button(cpu.watching ? "Unwatch" : "Watch")) {
+        cpu.watching = !cpu.watching;
+    }
+
     if (ImGui::CollapsingHeader("CPU")) {
         ImGui::Text("A: 0x%02x", cpu.a);
-        ImGui::SameLine();
         ImGui::Text("B: 0x%02x", cpu.b);
         ImGui::SameLine();
         ImGui::Text("C: 0x%02x", cpu.c);
-        ImGui::SameLine();
         ImGui::Text("D: 0x%02x", cpu.d);
-        ImGui::Text("E: 0x%02x", cpu.e);
         ImGui::SameLine();
+        ImGui::Text("E: 0x%02x", cpu.e);
         ImGui::Text("H: 0x%02x", cpu.h);
         ImGui::SameLine();
         ImGui::Text("L: 0x%02x", cpu.l);
-        ImGui::SameLine();
+        ImGui::Text("F: ZNHC");
+        ImGui::Text("   %d%d%d%d", (cpu.f & 0x80) != 0, (cpu.f & 0x40) != 0,
+                    (cpu.f & 0x20) != 0, (cpu.f & 0x10) != 0);
         ImGui::Text("SP: 0x%04x", cpu.sp);
         ImGui::NewLine();
         ImGui::Text("IME %d  EF", cpu.ime);
@@ -394,6 +428,11 @@ void cpp_imgui_render(void) {
         ImGui::Text("Timer  %d%d", cpu.memory.timer_ie, cpu.memory.timer_if);
         ImGui::Text("Serial %d%d", cpu.memory.serial_ie, cpu.memory.serial_if);
         ImGui::Text("Joypad %d%d", cpu.memory.joypad_ie, cpu.memory.joypad_if);
+    }
+
+    if (ImGui::CollapsingHeader("PPU")) {
+        ImGui::Text("X position: %d", ppu.drawing_x);
+        ImGui::Text("Y position: %d", ppu.drawing_y);
     }
 
     if (ImGui::CollapsingHeader("APU")) {
@@ -433,13 +472,35 @@ void cpp_imgui_render(void) {
                     ppu.a, ppu.b, ppu.start, ppu.select);
     }
 
+    if (ImGui::CollapsingHeader("ROM")) {
+        ImGui::InputInt("Page", &rom_page);
+        if (rom_page < 0)
+            rom_page = 0;
+        if (rom_page > 127)
+            rom_page = 127;
+        ImGui::BeginTable("##rompages", 8,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg);
+        for (uint8_t i = 0; i < 32; i++) {
+            for (uint8_t j = 0; j < 8; j++) {
+                ImGui::TableNextColumn();
+                ImGui::Text("0x%02x", read_8(rom_page * 256 + i * 8 + j));
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("0x%02x", rom_page * 256 + i * 8 + j);
+                }
+            }
+            if (i != 31)
+                ImGui::TableNextRow();
+        }
+        ImGui::EndTable();
+    }
+
     if (ImGui::CollapsingHeader("WRAM")) {
         ImGui::InputInt("Page", &wram_page);
         if (wram_page < 0)
             wram_page = 0;
         if (wram_page > 31)
             wram_page = 31;
-        ImGui::BeginTable("##pages", 8,
+        ImGui::BeginTable("##wrampages", 8,
                           ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg);
         for (uint8_t i = 0; i < 32; i++) {
             for (uint8_t j = 0; j < 8; j++) {
@@ -462,19 +523,22 @@ void cpp_imgui_render(void) {
                           ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg);
         for (uint8_t i = 0; i < 16; i++) {
             for (uint8_t j = 0; j < 8; j++) {
-                if(i * 8 + j == 127) break;
+                if (i * 8 + j == 127)
+                    break;
                 ImGui::TableNextColumn();
-                ImGui::Text("0x%02x",
-                            read_8(0xff80 + i * 8 + j));
+                ImGui::Text("0x%02x", read_8(0xff80 + i * 8 + j));
                 if (ImGui::IsItemHovered()) {
-                    ImGui::SetTooltip("0x%02x",
-                                      0xff80 + i * 8 + j);
+                    ImGui::SetTooltip("0x%02x", 0xff80 + i * 8 + j);
                 }
             }
             if (i != 31)
                 ImGui::TableNextRow();
         }
         ImGui::EndTable();
+    }
+
+    if(ImGui::Button("Quit & Dump")) {
+        exit(0);
     }
 
     ImGui::End();

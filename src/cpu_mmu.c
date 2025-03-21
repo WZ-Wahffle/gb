@@ -31,10 +31,9 @@ static uint8_t boot_rom[] = {
     0xa8, 0x00, 0x1a, 0x13, 0xbe, 0x20, 0xfe, 0x23, 0x7d, 0xfe, 0x34, 0x20,
     0xf5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xfb, 0x86, 0x20, 0xfe,
     0x3e, 0x01, 0xe0, 0x50};
-static bool booting = true;
 
 uint8_t mmu_read(uint16_t addr) {
-    if (booting && addr < 0x100) {
+    if (!cpu.memory.finished_boot && addr < 0x100) {
         return boot_rom[addr];
     } else if (addr < 0x8000) {
         return cpu.memory.read(addr);
@@ -87,7 +86,11 @@ uint8_t mmu_read(uint16_t addr) {
 }
 
 void mmu_write(uint16_t addr, uint8_t value) {
-    if (booting && addr < 0x100) {
+    if(addr == cpu.watch_addr && cpu.watching) {
+        cpu.watch_interrupt = true;
+    }
+
+    if (!cpu.memory.finished_boot && addr < 0x100) {
         boot_rom[addr] = value;
     } else if (addr < 0x8000) {
         cpu.memory.write(addr, value);
@@ -112,10 +115,10 @@ void mmu_write(uint16_t addr, uint8_t value) {
             ppu.select_buttons = value & 0x20;
             break;
         case 0xff01:
-            printf("TODO: Serial transfer data\n");
+            printf("TODO: Serial transfer data 0x%02x %c\n", value, value);
             break;
         case 0xff02:
-            printf("TODO: Serial transfer control\n");
+            printf("TODO: Serial transfer control 0x%02x\n", value);
             break;
         case 0xff06:
             cpu.memory.timer_modulo = value;
@@ -219,7 +222,7 @@ void mmu_write(uint16_t addr, uint8_t value) {
             ppu.wx = value;
             break;
         case 0xff50:
-            booting = false;
+            cpu.memory.finished_boot = true;
             break;
         case 0xff7f:
             // this page intentionally left blank

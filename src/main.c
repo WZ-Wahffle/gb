@@ -11,8 +11,11 @@ extern apu_t apu;
 void exit_cb(int code, void *param) {
     (void)code;
     (void)param;
-    printf("\nPC: 0x%04x\n", cpu.pc);
-    printf("Previous opcode: 0x%02x\n", cpu.opcode);
+
+    printf("Trace:\n");
+    for(uint16_t idx = cpu.prev_idx+1; idx != cpu.prev_idx; idx++) {
+        printf("0x%04x: 0x%02x\n", cpu.prev_pc[idx], cpu.prev_opcode[idx]);
+    }
 }
 
 int main(int argc, char **argv) {
@@ -46,6 +49,20 @@ int main(int argc, char **argv) {
         ASSERT(0, "Unsupported cart type 0x%02x\n", cart_type);
         break;
     }
+
+    #ifdef SKIP_BOOT
+    cpu.a = 0x01;
+    cpu.f = 0xb0;
+    cpu.b = 0x00;
+    cpu.c = 0x13;
+    cpu.d = 0x00;
+    cpu.e = 0xd8;
+    cpu.h = 0x01;
+    cpu.l = 0x4d;
+    cpu.sp = 0xfffe;
+    cpu.pc = 0x100;
+    cpu.memory.finished_boot = true;
+    #endif
 
     apu_init();
     on_exit(exit_cb, NULL);

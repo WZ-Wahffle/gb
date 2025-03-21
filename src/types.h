@@ -8,6 +8,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define DYNARRAY(type)                                                         \
+    typedef struct {                                                           \
+        type *items;                                                           \
+        size_t count;                                                          \
+        size_t capacity;                                                       \
+    } dyn_##type;                                                              \
+    inline void dyn_##type##_append(dyn_##type arr, type elem) {                \
+        if (arr.count >= arr.capacity) {                                       \
+            if (arr.capacity == 0)                                             \
+                arr.capacity = 8;                                              \
+            else                                                               \
+                arr.capacity *= 2;                                             \
+            arr.items =                                                        \
+                (type *)realloc(arr.items, arr.capacity * sizeof(*arr.items)); \
+        }                                                                      \
+        arr.items[arr.count++] = elem;                                         \
+    }
+
+DYNARRAY(uint32_t)
 // custom assertion macro to allow registering exit callback
 #define ASSERT(val, msg, ...)                                                  \
     do {                                                                       \
@@ -33,6 +52,7 @@
 #define CYCLES_PER_DOT (CPU_FREQ / DOT_FREQ)
 #define SCANLINE_COUNT 154
 #define SAMPLE_RATE 48000
+#define PLAYBACK_SPEED 10.0
 
 typedef enum { B, C, D, E, H, L, INDHL, A } r8_t;
 
@@ -72,6 +92,7 @@ typedef struct {
     bool joypad_ie, joypad_if;
     uint8_t timer_counter, timer_modulo, timer_clock_select;
     bool timer_enable;
+    bool finished_boot;
 } cpu_mmu_t;
 
 typedef struct {
@@ -83,6 +104,14 @@ typedef struct {
     state_t state;
     uint16_t breakpoint;
     bool ime;
+
+    uint16_t prev_pc[0x10000];
+    uint16_t prev_idx;
+    uint8_t prev_opcode[0x10000];
+
+    uint16_t watch_addr;
+    bool watching;
+    bool watch_interrupt;
 } cpu_t;
 
 typedef struct {
@@ -90,6 +119,7 @@ typedef struct {
     uint8_t bg_color[4];
     uint8_t obj_color_1[4];
     uint8_t obj_color_2[4];
+    double remaining_cycles;
     uint8_t scroll_x, scroll_y;
     bool ppu_enable;
     bool window_tile_map_location;
@@ -105,6 +135,7 @@ typedef struct {
     uint8_t wx, wy;
     bool select_buttons, select_dpad;
     bool a, b, start, select, up, down, left, right;
+    uint16_t drawing_x, drawing_y;
 } ppu_t;
 
 typedef struct {
