@@ -52,7 +52,7 @@ DYNARRAY(uint32_t)
 #define CYCLES_PER_DOT (CPU_FREQ / DOT_FREQ)
 #define SCANLINE_COUNT 154
 #define SAMPLE_RATE 48000
-#define PLAYBACK_SPEED 10.0
+#define PLAYBACK_SPEED 1.0
 
 typedef enum { B, C, D, E, H, L, INDHL, A } r8_t;
 

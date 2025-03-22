@@ -1,4 +1,3 @@
-#include <vector>
 #define NO_FONT_AWESOME
 #include "cpu.h"
 #include "imgui.h"

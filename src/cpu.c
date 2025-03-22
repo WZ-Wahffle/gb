@@ -265,7 +265,7 @@ void execute(void) {
     cpu.remaining_cycles -= cycle_lookup[opcode] * 4;
 
     cpu.prev_opcode[cpu.prev_idx] = opcode;
-    cpu.prev_pc[cpu.prev_idx] = cpu.pc-1;
+    cpu.prev_pc[cpu.prev_idx] = cpu.pc - 1;
     cpu.prev_idx++;
 
     if (cpu.opcode == 0xcb) {
@@ -304,10 +304,15 @@ void execute(void) {
                 set_status_bit(C_STATUS, r8_read(opcode & 0b111) & 0b1);
                 r8_write(opcode & 0b111, result);
             } break;
-            case 4:
+            case 4: {
                 // sla r8
-                TODO("sla r8");
-                break;
+                uint8_t result = r8_read(opcode & 0b111) * 2;
+                set_status_bit(Z_STATUS, result == 0);
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, false);
+                set_status_bit(C_STATUS, r8_read(opcode & 0b111) & 0x80);
+                r8_write(opcode & 0b111, result);
+            } break;
             case 5:
                 // sra r8
                 TODO("sra r8");
@@ -616,7 +621,7 @@ void execute(void) {
             else if (opcode == 0b11110000)
                 cpu.a = read_8(0xff00 + next_8());
             else if (opcode == 0b11111010)
-                cpu.a = read_8(read_16(next_16()));
+                cpu.a = read_8(next_16());
             else if (opcode == 0b11101000)
                 TODO("add sp, imm8");
             else if (opcode == 0b11111000) {
@@ -624,7 +629,8 @@ void execute(void) {
                 uint16_t result = cpu.sp + operand;
                 set_status_bit(Z_STATUS, false);
                 set_status_bit(N_STATUS, false);
-                set_status_bit(H_STATUS, (cpu.sp & 0xfff) + (operand & 0xfff) > 0xfff);
+                set_status_bit(H_STATUS,
+                               (cpu.sp & 0xfff) + (operand & 0xfff) > 0xfff);
                 set_status_bit(C_STATUS, cpu.sp + operand > 0xffff);
                 r16_write(HL, result);
             } else if (opcode == 0b11111001)

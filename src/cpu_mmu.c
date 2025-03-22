@@ -86,7 +86,7 @@ uint8_t mmu_read(uint16_t addr) {
 }
 
 void mmu_write(uint16_t addr, uint8_t value) {
-    if(addr == cpu.watch_addr && cpu.watching) {
+    if (addr == cpu.watch_addr && cpu.watching) {
         cpu.watch_interrupt = true;
     }
 
@@ -223,6 +223,13 @@ void mmu_write(uint16_t addr, uint8_t value) {
             break;
         case 0xff50:
             cpu.memory.finished_boot = true;
+            break;
+        case 0xff4f:
+        case 0xff68:
+        case 0xff69:
+        case 0xff6a:
+        case 0xff6b:
+            printf("Write to CGB register\n");
             break;
         case 0xff7f:
             // this page intentionally left blank
