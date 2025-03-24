@@ -14,7 +14,7 @@
         size_t count;                                                          \
         size_t capacity;                                                       \
     } dyn_##type;                                                              \
-    inline void dyn_##type##_append(dyn_##type arr, type elem) {                \
+    inline void dyn_##type##_append(dyn_##type arr, type elem) {               \
         if (arr.count >= arr.capacity) {                                       \
             if (arr.capacity == 0)                                             \
                 arr.capacity = 8;                                              \
@@ -42,6 +42,9 @@ DYNARRAY(uint32_t)
 #define TO_U16(lsb, msb) ((lsb & 0xff) | ((msb & 0xff) << 8))
 #define LOBYTE(val) ((val) & 0xff)
 #define HIBYTE(val) (((val) >> 8) & 0xff)
+#define IN_INTERVAL(val, min, max) ((val) >= (min) && (val) < (max))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define CPU_FREQ 4194304.
 #define VIEWPORT_WIDTH 160
 #define VIEWPORT_HEIGHT 144
@@ -104,14 +107,21 @@ typedef struct {
     state_t state;
     uint16_t breakpoint;
     bool ime;
+    uint8_t div;
+    bool halted;
 
     uint16_t prev_pc[0x10000];
     uint16_t prev_idx;
     uint8_t prev_opcode[0x10000];
 
     uint16_t watch_addr;
-    bool watching;
-    bool watch_interrupt;
+    bool watching_addr;
+    bool watch_addr_interrupt;
+
+    uint8_t watch_opcode;
+    bool watching_opcode;
+    bool watch_opcode_interrupt;
+
 } cpu_t;
 
 typedef struct {
@@ -175,6 +185,7 @@ typedef struct {
     uint8_t initial_length_timer;
 
     uint8_t output_level;
+    uint8_t volume;
 
     uint8_t period_low;
 
@@ -183,6 +194,8 @@ typedef struct {
     bool trigger;
 
     uint8_t wave_ram[16];
+
+    uint32_t frequency;
 } wave_channel_t;
 
 typedef struct {
@@ -200,7 +213,7 @@ typedef struct {
 
     uint8_t clock_shift;
     bool narrow_lfsr;
-    uint8_t clock_divider;
+    float clock_divider;
     uint16_t lfsr;
 
     bool length_enable;

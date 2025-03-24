@@ -65,12 +65,26 @@ uint8_t mmu_read(uint16_t addr) {
                        (ppu.select_dpad << 4) | (ppu.select_buttons << 5);
             }
             return 0xf | (ppu.select_dpad << 4) | (ppu.select_buttons << 5);
+        case 0xff04:
+            return cpu.div;
+        case 0xff4d:
+        case 0xff4f:
+        case 0xff68:
+        case 0xff69:
+        case 0xff6a:
+        case 0xff6b:
+            printf("Write to CGB register\n");
+            return 0;
         case 0xff40:
             return (ppu.bg_window_enable << 0) | (ppu.enable_objects << 1) |
                    (ppu.large_objects << 2) | (ppu.bg_tile_map_location << 3) |
                    (ppu.bg_window_tile_data_location << 4) |
                    (ppu.window_enable << 5) |
                    (ppu.window_tile_map_location << 6) | (ppu.ppu_enable << 7);
+        case 0xff41:
+            return (ppu.mode << 0) | ((ppu.ly == ppu.lyc) << 2) |
+                   (ppu.mode_0_int << 3) | (ppu.mode_1_int << 4) |
+                   (ppu.mode_2_int << 5) | (ppu.lyc_int << 6);
         case 0xff42:
             return ppu.scroll_y;
         case 0xff44:
@@ -86,8 +100,8 @@ uint8_t mmu_read(uint16_t addr) {
 }
 
 void mmu_write(uint16_t addr, uint8_t value) {
-    if (addr == cpu.watch_addr && cpu.watching) {
-        cpu.watch_interrupt = true;
+    if (addr == cpu.watch_addr && cpu.watching_addr) {
+        cpu.watch_addr_interrupt = true;
     }
 
     if (!cpu.memory.finished_boot && addr < 0x100) {
@@ -115,10 +129,10 @@ void mmu_write(uint16_t addr, uint8_t value) {
             ppu.select_buttons = value & 0x20;
             break;
         case 0xff01:
-            printf("TODO: Serial transfer data 0x%02x %c\n", value, value);
+            // printf("TODO: Serial transfer data 0x%02x %c\n", value, value);
             break;
         case 0xff02:
-            printf("TODO: Serial transfer control 0x%02x\n", value);
+            // printf("TODO: Serial transfer control 0x%02x\n", value);
             break;
         case 0xff06:
             cpu.memory.timer_modulo = value;
@@ -162,7 +176,19 @@ void mmu_write(uint16_t addr, uint8_t value) {
             ch2_period_high_control(value);
             break;
         case 0xff1a:
-            apu.ch3.enable = false;
+            apu.ch3.dac_on = value & 0x80;
+            break;
+        case 0xff1b:
+            apu.ch3.initial_length_timer = value;
+            break;
+        case 0xff1c:
+            apu.ch3.output_level = (value >> 5) & 0b11;
+            break;
+        case 0xff1d:
+            ch3_period_low(value);
+            break;
+        case 0xff1e:
+            ch3_period_high_control(value);
             break;
         case 0xff20:
             ch4_length_timer(value);
@@ -184,6 +210,24 @@ void mmu_write(uint16_t addr, uint8_t value) {
             break;
         case 0xff26:
             audio_master_control(value);
+            break;
+        case 0xff30:
+        case 0xff31:
+        case 0xff32:
+        case 0xff33:
+        case 0xff34:
+        case 0xff35:
+        case 0xff36:
+        case 0xff37:
+        case 0xff38:
+        case 0xff39:
+        case 0xff3a:
+        case 0xff3b:
+        case 0xff3c:
+        case 0xff3d:
+        case 0xff3e:
+        case 0xff3f:
+            apu.ch3.wave_ram[addr - 0xff30] = value;
             break;
         case 0xff40:
             lcd_control(value);
@@ -224,6 +268,7 @@ void mmu_write(uint16_t addr, uint8_t value) {
         case 0xff50:
             cpu.memory.finished_boot = true;
             break;
+        case 0xff4d:
         case 0xff4f:
         case 0xff68:
         case 0xff69:

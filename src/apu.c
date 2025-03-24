@@ -24,6 +24,7 @@ static void ch1_cb(void *buffer, uint32_t sample_count) {
     // not really part of the audio channel, but might as well make use of the
     // timing functionality
     static float timer_timer = 0.f;
+    static float div_timer = 0.f;
 
     int16_t *out = (int16_t *)buffer;
 
@@ -33,8 +34,8 @@ static void ch1_cb(void *buffer, uint32_t sample_count) {
     for (uint32_t i = 0; i < sample_count; i++) {
         out[i] = (int16_t)(32000.f * 0.02 *
                            square_wave(2 * PI * square_idx, apu.ch1.wave_duty) *
-                           (apu.audio_enable) * (apu.ch1.enable ? 1 : 0) *
-                           (apu.ch1.volume / 15.f));
+                           (apu.audio_enable ? 1 : 0) *
+                           (apu.ch1.enable ? 1 : 0) * (apu.ch1.volume / 15.f));
         square_idx += apu.ch1.frequency / (float)SAMPLE_RATE;
         while (square_idx > 1)
             square_idx -= 1;
@@ -69,6 +70,12 @@ static void ch1_cb(void *buffer, uint32_t sample_count) {
                     (CPU_FREQ / 4);
             }
         }
+
+        div_timer += 1.f / SAMPLE_RATE;
+        while(div_timer > 1.f / 16384.f) {
+            cpu.div++;
+            div_timer -= 1.f / 16384.f;
+        }
     }
 }
 
@@ -83,8 +90,8 @@ static void ch2_cb(void *buffer, uint32_t sample_count) {
     for (uint32_t i = 0; i < sample_count; i++) {
         out[i] = (int16_t)(32000.f * 0.02 *
                            square_wave(2 * PI * square_idx, apu.ch2.wave_duty) *
-                           (apu.audio_enable) * (apu.ch2.enable ? 1 : 0) *
-                           (apu.ch2.volume / 15.f));
+                           (apu.audio_enable ? 1 : 0) *
+                           (apu.ch2.enable ? 1 : 0) * (apu.ch2.volume / 15.f));
         square_idx += apu.ch2.frequency / (float)SAMPLE_RATE;
         while (square_idx > 1)
             square_idx -= 1;
@@ -102,6 +109,24 @@ static void ch2_cb(void *buffer, uint32_t sample_count) {
                 envelope_timer -= (1.f / 64.f) * apu.ch2.envelope_pace;
             }
         }
+    }
+}
+
+static void ch3_cb(void *buffer, uint32_t sample_count) {
+    static float table_idx = 1.f;
+    int16_t *out = (int16_t *)buffer;
+
+    for (uint32_t i = 0; i < sample_count; i++) {
+        out[i] =
+            (int16_t)(32000.f * 0.02 *
+                      ((((uint8_t)table_idx % 2)
+                           ? (apu.ch3.wave_ram[(uint8_t)table_idx / 2] & 0xf)
+                           : (apu.ch3.wave_ram[(uint8_t)table_idx / 2] >> 4)) / 8.f - 1.f) *
+                      (apu.audio_enable ? 1 : 0) * (apu.ch3.enable ? 1 : 0) *
+                      (apu.ch3.dac_on ? 1 : 0) * (apu.ch3.volume / 4.f));
+        table_idx += (32 * apu.ch3.frequency / (float)SAMPLE_RATE);
+        if (table_idx >= 32)
+            table_idx = 0;
     }
 }
 
@@ -150,14 +175,23 @@ void apu_init(void) {
     SetTraceLogLevel(LOG_ERROR);
     InitAudioDevice();
     SetAudioStreamBufferSizeDefault(1024);
+
     apu.ch1.handle = LoadAudioStream(SAMPLE_RATE, 16, 1);
     SetAudioStreamCallback(apu.ch1.handle, ch1_cb);
     PlayAudioStream(apu.ch1.handle);
+
     apu.ch2.handle = LoadAudioStream(SAMPLE_RATE, 16, 1);
     SetAudioStreamCallback(apu.ch2.handle, ch2_cb);
     PlayAudioStream(apu.ch2.handle);
+
     apu.ch3.handle = LoadAudioStream(SAMPLE_RATE, 16, 1);
+    SetAudioStreamCallback(apu.ch3.handle, ch3_cb);
+    PlayAudioStream(apu.ch3.handle);
+
+    apu.ch4.clock_divider = 0.5;
     apu.ch4.handle = LoadAudioStream(SAMPLE_RATE, 16, 1);
+    SetAudioStreamCallback(apu.ch4.handle, ch4_cb);
+    PlayAudioStream(apu.ch4.handle);
 }
 
 void audio_master_control(uint8_t val) {
@@ -244,6 +278,23 @@ void ch2_period_high_control(uint8_t val) {
     }
 }
 
+void ch3_period_low(uint8_t val) { apu.ch3.period_low = val; }
+
+void ch3_period_high_control(uint8_t val) {
+    apu.ch3.period_high = val & 0b111;
+    apu.ch3.length_enable = val & 0x40;
+    if (val & 0x80) {
+        apu.ch3.enable = true;
+        apu.ch3.frequency =
+            65536 / (2048 - TO_U16(apu.ch3.period_low, apu.ch3.period_high));
+
+        if (apu.ch3.output_level == 0)
+            apu.ch3.volume = 0;
+        else
+            apu.ch3.volume = 4 >> (apu.ch3.output_level - 1);
+    }
+}
+
 void ch4_length_timer(uint8_t val) {
     apu.ch4.initial_length_timer = val & 0x3f;
 }
@@ -256,6 +307,7 @@ void ch4_volume_envelope(uint8_t val) {
 
 void ch4_frequency_randomness(uint8_t val) {
     apu.ch4.clock_divider = val & 0b111;
+    if(apu.ch4.clock_divider == 0) apu.ch4.clock_divider = 0.5f;
     apu.ch4.narrow_lfsr = val & 0x8;
     apu.ch4.clock_shift = val >> 4;
 }

@@ -56,10 +56,15 @@ static void try_step_cpu(void) {
             cpu.state = STOPPED;
             return;
         }
-        if (cpu.watch_interrupt) {
-            cpu.watch_interrupt = false;
+        if (cpu.watch_addr_interrupt) {
+            cpu.watch_addr_interrupt = false;
             cpu.state = STOPPED;
             return;
+        }
+
+        if (cpu.watch_opcode_interrupt) {
+            cpu.watch_opcode_interrupt = false;
+            cpu.state = STOPPED;
         }
     }
 }
@@ -88,7 +93,17 @@ static uint8_t get_window_tile_index(uint8_t x, uint8_t y) {
     return read_8(base + 32 * (y / 8) + (x / 8));
 }
 
-static uint8_t get_tile_color(uint8_t tile_index, uint8_t x, uint8_t y) {
+static uint8_t get_object_tile_color(uint8_t tile_index, uint8_t x, uint8_t y) {
+    ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
+    ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
+    uint16_t base = 0x8000;
+    uint16_t sprite_base_address = base + 16 * tile_index;
+    uint16_t line = read_16(sprite_base_address + y * 2);
+    return ((HIBYTE(line) & (1 << (7 - x))) != 0) +
+           2 * ((LOBYTE(line) & (1 << (7 - x))) != 0);
+}
+
+static uint8_t get_window_tile_color(uint8_t tile_index, uint8_t x, uint8_t y) {
     ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
     ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
     uint16_t base = ppu.bg_window_tile_data_location
@@ -101,14 +116,17 @@ static uint8_t get_tile_color(uint8_t tile_index, uint8_t x, uint8_t y) {
            2 * ((LOBYTE(line) & (1 << (7 - x))) != 0);
 }
 
-static void set_pixel(uint8_t x, uint8_t y) {
+static void set_pixel(uint8_t x, uint8_t y, uint32_t value) {
+    ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y] = value;
+}
+
+static void set_background_pixel(uint8_t x, uint8_t y) {
     uint8_t tile_index =
         get_window_tile_index(x + ppu.scroll_x, y + ppu.scroll_y);
-    uint8_t pixel = get_tile_color(tile_index, (x + ppu.scroll_x) % 8,
-                                   (y + ppu.scroll_y) % 8);
+    uint8_t pixel = get_window_tile_color(tile_index, (x + ppu.scroll_x) % 8,
+                                          (y + ppu.scroll_y) % 8);
 
-    ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y] =
-        colors[ppu.bg_color[pixel]];
+    set_pixel(x, y, colors[pixel]);
 }
 
 static void try_step_ppu(void) {
@@ -127,8 +145,37 @@ static void try_step_ppu(void) {
         }
 
         if (ppu.drawing_x >= 80 && ppu.drawing_x < 240) {
-            if (ppu.drawing_y < 144)
-                set_pixel(ppu.drawing_x - 80, ppu.drawing_y);
+            if (ppu.drawing_y < 144) {
+                uint8_t screen_x = ppu.drawing_x - 80;
+                uint8_t screen_y = ppu.drawing_y;
+                if (ppu.bg_window_enable) {
+                    set_background_pixel(ppu.drawing_x - 80, ppu.drawing_y);
+                }
+                if (ppu.enable_objects) {
+                    for (uint8_t i = 0; i < 40; i++) {
+                        if (ppu.large_objects) {
+                            TODO("large sprites");
+                        } else {
+                            if (IN_INTERVAL(cpu.memory.oam[i].y - 9, screen_y,
+                                            screen_y + 8) &&
+                                IN_INTERVAL(cpu.memory.oam[i].x - 1, screen_x,
+                                            screen_x + 8)) {
+                                uint8_t obj_x =
+                                    cpu.memory.oam[i].x - 1 - screen_x;
+                                uint8_t obj_y =
+                                    cpu.memory.oam[i].y - 9 - screen_y;
+                                    if(!(cpu.memory.oam[i].attr & 0x10)) obj_x = 7 - obj_x;
+                                    if(!(cpu.memory.oam[i].attr & 0x20)) obj_y = 7 - obj_y;
+
+                                set_pixel(
+                                    screen_x, screen_y,
+                                    colors[get_object_tile_color(
+                                        cpu.memory.oam[i].tile, obj_x, obj_y)]);
+                            }
+                        }
+                    }
+                }
+            }
 
             ppu.ly = ppu.drawing_y;
             if (ppu.lyc_int && ppu.ly == ppu.lyc)

@@ -57,6 +57,11 @@ uint16_t read_16(uint16_t addr) {
     return TO_U16(read_8(addr), read_8(addr + 1));
 }
 
+void write_16(uint16_t addr, uint16_t val) {
+    write_8(addr, val & 0xf);
+    write_8(addr + 1, val >> 8);
+}
+
 static uint8_t next_8(void) { return read_8(cpu.pc++); }
 
 static uint16_t next_16(void) {
@@ -252,7 +257,7 @@ static void r16stk_write(r16_stk_t dst, uint16_t val) {
         break;
     case AF_STK:
         cpu.a = HIBYTE(val);
-        cpu.f = LOBYTE(val);
+        cpu.f = LOBYTE(val) & 0xf0;
         break;
     default:
         UNREACHABLE_SWITCH(dst);
@@ -260,9 +265,24 @@ static void r16stk_write(r16_stk_t dst, uint16_t val) {
 }
 
 void execute(void) {
+    if (cpu.halted) {
+        cpu.remaining_cycles -= 4;
+
+        if ((cpu.memory.vblank_ie && cpu.memory.vblank_if) ||
+            (cpu.memory.lcd_ie && cpu.memory.lcd_if) ||
+            (cpu.memory.timer_ie && cpu.memory.timer_if) ||
+            (cpu.memory.serial_ie && cpu.memory.serial_if) ||
+            (cpu.memory.joypad_ie && cpu.memory.joypad_if)) {
+            cpu.halted = false;
+        }
+        return;
+    }
+
     cpu.opcode = next_8();
     uint8_t opcode = cpu.opcode;
     cpu.remaining_cycles -= cycle_lookup[opcode] * 4;
+    if (cpu.watching_opcode && opcode == cpu.watch_opcode)
+        cpu.watch_opcode_interrupt = true;
 
     cpu.prev_opcode[cpu.prev_idx] = opcode;
     cpu.prev_pc[cpu.prev_idx] = cpu.pc - 1;
@@ -272,16 +292,32 @@ void execute(void) {
         cpu.opcode = next_8();
         opcode = cpu.opcode;
         cpu.remaining_cycles -= extended_lookup[opcode % 8] * 4;
+        if (cpu.watching_opcode && opcode == cpu.watch_opcode)
+            cpu.watch_opcode_interrupt = true;
         if ((opcode >> 6) == 0) {
             switch ((opcode >> 3) & 0b111) {
-            case 0:
+            case 0: {
                 // rlc r8
-                TODO("rlc r8");
+                uint8_t operand = r8_read(opcode & 0b111);
+                uint8_t result = operand * 2 + (operand >> 7);
+                set_status_bit(Z_STATUS, result == 0);
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, false);
+                set_status_bit(C_STATUS, operand & 0x80);
+                r8_write(opcode & 0b111, result);
                 break;
-            case 1:
+            }
+            case 1: {
                 // rrc r8
-                TODO("rrc r8");
+                uint8_t operand = r8_read(opcode & 0b111);
+                uint8_t result = operand / 2 + ((operand & 1) ? 0x80 : 0);
+                set_status_bit(Z_STATUS, result == 0);
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, false);
+                set_status_bit(C_STATUS, operand & 1);
+                r8_write(opcode & 0b111, result);
                 break;
+            }
             case 2: {
                 // rl r8
                 uint8_t result = r8_read(opcode & 0b111) * 2 +
@@ -366,15 +402,30 @@ void execute(void) {
         case 0:
             if (opcode == 0b00000000) {
                 // this page intentionally left blank
-            } else if (opcode == 0b00000111)
-                TODO("rlca");
-            else if (opcode == 0b00001000)
-                TODO("ld [imm16], sp");
-            else if (opcode == 0b00001111)
-                TODO("rrca");
-            else if (opcode == 0b00010000)
-                TODO("stop");
-            else if (opcode == 0b00010111) {
+            } else if (opcode == 0b00000111) {
+                // rlca
+                uint8_t result = cpu.a * 2 + (cpu.a >> 7);
+                set_status_bit(Z_STATUS, false);
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, false);
+                set_status_bit(C_STATUS, cpu.a & 0x80);
+                cpu.a = result;
+            } else if (opcode == 0b00001000) {
+                // ld [imm16], sp
+                write_16(next_16(), cpu.sp);
+            } else if (opcode == 0b00001111) {
+                // rrca
+                uint8_t result = cpu.a / 2 + ((cpu.a & 1) ? 0x80 : 0);
+                set_status_bit(Z_STATUS, false);
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, false);
+                set_status_bit(C_STATUS, cpu.a & 1);
+                cpu.a = result;
+            } else if (opcode == 0b00010000) {
+                // stop
+                cpu.state = STOPPED;
+            } else if (opcode == 0b00010111) {
+                // rla
                 uint8_t result = cpu.a * 2 + (get_status_bit(C_STATUS) ? 1 : 0);
                 set_status_bit(Z_STATUS, false);
                 set_status_bit(N_STATUS, false);
@@ -391,17 +442,42 @@ void execute(void) {
                 set_status_bit(H_STATUS, false);
                 set_status_bit(C_STATUS, cpu.a & 0b1);
                 cpu.a = result;
-            } else if (opcode == 0b00100111)
-                TODO("daa");
-            else if (opcode == 0b00101111) {
+            } else if (opcode == 0b00100111) {
+                // daa
+                uint8_t offset = 0;
+                bool should_carry = false;
+                if ((!get_status_bit(N_STATUS) && (cpu.a & 0xf) > 0x9) ||
+                    get_status_bit(H_STATUS)) {
+                    offset += 0x6;
+                }
+                if ((!get_status_bit(N_STATUS) && cpu.a > 0x99) ||
+                    get_status_bit(C_STATUS)) {
+                    offset += 0x60;
+                    should_carry = true;
+                }
+                if (!get_status_bit(N_STATUS)) {
+                    cpu.a += offset;
+                } else {
+                    cpu.a -= offset;
+                }
+                set_status_bit(Z_STATUS, cpu.a == 0);
+                set_status_bit(H_STATUS, false);
+                set_status_bit(C_STATUS, should_carry);
+            } else if (opcode == 0b00101111) {
                 cpu.a = ~cpu.a;
                 set_status_bit(N_STATUS, true);
                 set_status_bit(H_STATUS, true);
-            } else if (opcode == 0b00110111)
-                TODO("scf");
-            else if (opcode == 0b00111111)
-                TODO("ccf");
-            else if ((opcode & 0b11100111) == 0b100000) {
+            } else if (opcode == 0b00110111) {
+                // scf
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, false);
+                set_status_bit(C_STATUS, true);
+            } else if (opcode == 0b00111111) {
+                // ccf
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, false);
+                set_status_bit(C_STATUS, !get_status_bit(C_STATUS));
+            } else if ((opcode & 0b11100111) == 0b100000) {
                 if (resolve_cond((opcode >> 3) & 0b11))
                     cpu.pc += (int8_t)next_8();
                 else
@@ -464,9 +540,10 @@ void execute(void) {
             }
             break;
         case 1:
-            if (opcode == 0b01110110)
-                TODO("halt");
-            else {
+            if (opcode == 0b01110110) {
+                // halt
+                cpu.halted = true;
+            } else {
                 r8_write((opcode >> 3) & 0b111, r8_read(opcode & 0b111));
             }
             break;
@@ -497,6 +574,7 @@ void execute(void) {
                 break;
             } break;
             case 2: {
+                // sub a, r8
                 uint8_t operand = r8_read(opcode & 0b111);
                 uint8_t result = cpu.a - operand;
                 set_status_bit(Z_STATUS, result == 0);
@@ -506,9 +584,18 @@ void execute(void) {
                 cpu.a = result;
                 break;
             }
-            case 3:
-                TODO("sbc a, r8");
+            case 3: {
+                // sbc a, r8
+                uint8_t operand =
+                    r8_read(opcode & 0b111) + get_status_bit(C_STATUS);
+                uint8_t result = cpu.a - operand;
+                set_status_bit(Z_STATUS, result == 0);
+                set_status_bit(N_STATUS, true);
+                set_status_bit(H_STATUS, (operand & 0xf) > (cpu.a & 0xf));
+                set_status_bit(C_STATUS, operand > cpu.a);
+                cpu.a = result;
                 break;
+            }
             case 4: {
                 cpu.a &= r8_read(opcode & 0b111);
                 set_status_bit(Z_STATUS, cpu.a == 0);
@@ -545,18 +632,20 @@ void execute(void) {
             break;
         case 3:
             if (opcode == 0b11000110) {
+                // add a, imm8
                 uint8_t operand = next_8();
                 uint8_t result = cpu.a + operand;
                 set_status_bit(Z_STATUS, result == 0);
-                set_status_bit(N_STATUS, true);
+                set_status_bit(N_STATUS, false);
                 set_status_bit(H_STATUS, (operand & 0xf) + (cpu.a & 0xf) > 0xf);
                 set_status_bit(C_STATUS, operand + cpu.a > 0xff);
                 cpu.a = result;
             } else if (opcode == 0b11001110) {
+                // adc a, imm8
                 uint8_t operand = next_8();
                 uint8_t result = cpu.a + operand + get_status_bit(C_STATUS);
                 set_status_bit(Z_STATUS, result == 0);
-                set_status_bit(N_STATUS, true);
+                set_status_bit(N_STATUS, false);
                 set_status_bit(H_STATUS, (operand & 0xf) + (cpu.a & 0xf) +
                                                  get_status_bit(C_STATUS) >
                                              0xf);
@@ -565,6 +654,7 @@ void execute(void) {
                                    0xff);
                 cpu.a = result;
             } else if (opcode == 0b11010110) {
+                // sub a, imm8
                 uint8_t operand = next_8();
                 uint8_t result = cpu.a - operand;
                 set_status_bit(Z_STATUS, result == 0);
@@ -572,9 +662,18 @@ void execute(void) {
                 set_status_bit(H_STATUS, (operand & 0xf) > (cpu.a & 0xf));
                 set_status_bit(C_STATUS, operand > cpu.a);
                 cpu.a = result;
-            } else if (opcode == 0b11011110)
-                TODO("sbc a, imm8");
-            else if (opcode == 0b11100110) {
+            } else if (opcode == 0b11011110) {
+                // sbc a, imm8
+                uint8_t carry = (get_status_bit(C_STATUS) ? 1 : 0);
+                uint8_t operand = next_8();
+                uint8_t result = cpu.a - operand - carry;
+                set_status_bit(Z_STATUS, result == 0);
+                set_status_bit(N_STATUS, true);
+                set_status_bit(H_STATUS,
+                               (cpu.a & 0xf) < (operand & 0xf) + carry);
+                set_status_bit(C_STATUS, cpu.a < operand + carry);
+                cpu.a = result;
+            } else if (opcode == 0b11100110) {
                 cpu.a &= next_8();
                 set_status_bit(Z_STATUS, cpu.a == 0);
                 set_status_bit(N_STATUS, false);
@@ -593,12 +692,13 @@ void execute(void) {
                 set_status_bit(H_STATUS, false);
                 set_status_bit(C_STATUS, false);
             } else if (opcode == 0b11111110) {
+                // cp imm8
                 uint8_t operand = next_8();
                 uint8_t result = cpu.a - operand;
                 set_status_bit(Z_STATUS, result == 0);
                 set_status_bit(N_STATUS, true);
-                set_status_bit(H_STATUS, (operand & 0xf) < (cpu.a & 0xf));
-                set_status_bit(C_STATUS, cpu.a < result);
+                set_status_bit(H_STATUS, (cpu.a & 0xf) < (operand & 0xf));
+                set_status_bit(C_STATUS, cpu.a < operand);
             } else if (opcode == 0b11001001)
                 ret();
             else if (opcode == 0b11011001) {
@@ -633,9 +733,10 @@ void execute(void) {
                                (cpu.sp & 0xfff) + (operand & 0xfff) > 0xfff);
                 set_status_bit(C_STATUS, cpu.sp + operand > 0xffff);
                 r16_write(HL, result);
-            } else if (opcode == 0b11111001)
-                TODO("ld sp, hl");
-            else if (opcode == 0b11110011)
+            } else if (opcode == 0b11111001) {
+                // ld sp, hl
+                cpu.sp = r16_read(HL);
+            } else if (opcode == 0b11110011)
                 cpu.ime = false;
             else if (opcode == 0b11111011)
                 cpu.ime = true;

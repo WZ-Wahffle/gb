@@ -1,3 +1,6 @@
+#include "apu.h"
+#include <cmath>
+#include <thread>
 #define NO_FONT_AWESOME
 #include "cpu.h"
 #include "imgui.h"
@@ -321,6 +324,8 @@ static uint8_t poke_value = 0;
 
 void cpp_init(void) {
     rlImGuiSetup(true);
+    std::thread t = std::thread{apu_init};
+    t.detach();
 }
 
 void cpp_imgui_render(void) {
@@ -381,28 +386,41 @@ void cpp_imgui_render(void) {
     ImGui::Text("Location: 0x");
     ImGui::SameLine();
     ImGui::PushItemWidth(2.5 * ImGui::GetFontSize());
-    ImGui::InputScalar("##pokeloc", ImGuiDataType_U16, &poke_location, NULL, NULL,
-                       "%04x");
+    ImGui::InputScalar("##pokeloc", ImGuiDataType_U16, &poke_location, NULL,
+                       NULL, "%04x");
     ImGui::PopItemWidth();
     ImGui::SameLine();
     ImGui::Text("Value: 0x");
     ImGui::PushItemWidth(1.5 * ImGui::GetFontSize());
     ImGui::SameLine();
-    ImGui::InputScalar("##pokeval", ImGuiDataType_U8, &poke_value, NULL, NULL, "%02x");
+    ImGui::InputScalar("##pokeval", ImGuiDataType_U8, &poke_value, NULL, NULL,
+                       "%02x");
     ImGui::PopItemWidth();
     ImGui::SameLine();
-    if(ImGui::Button("Poke")) {
+    if (ImGui::Button("Poke")) {
         write_8(poke_location, poke_value);
     }
 
     ImGui::Text("Memory watchpoint: 0x");
     ImGui::SameLine();
     ImGui::PushItemWidth(2.5 * ImGui::GetFontSize());
-    ImGui::InputScalar("##watchloc", ImGuiDataType_U16, &cpu.watch_addr, NULL, NULL, "%04x");
+    ImGui::InputScalar("##memwatchloc", ImGuiDataType_U16, &cpu.watch_addr,
+                       NULL, NULL, "%04x");
     ImGui::PopItemWidth();
     ImGui::SameLine();
-    if(ImGui::Button(cpu.watching ? "Unwatch" : "Watch")) {
-        cpu.watching = !cpu.watching;
+    if (ImGui::Button(cpu.watching_addr ? "Unwatch##mem" : "Watch##mem")) {
+        cpu.watching_addr = !cpu.watching_addr;
+    }
+
+    ImGui::Text("Opcode watchpoint: 0x");
+    ImGui::SameLine();
+    ImGui::PushItemWidth(2.5 * ImGui::GetFontSize());
+    ImGui::InputScalar("##opwatchloc", ImGuiDataType_U8, &cpu.watch_opcode,
+                       NULL, NULL, "%02x");
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+    if (ImGui::Button(cpu.watching_opcode ? "Unwatch##op" : "Watch##op")) {
+        cpu.watching_opcode = !cpu.watching_opcode;
     }
 
     if (ImGui::CollapsingHeader("CPU")) {
@@ -430,11 +448,70 @@ void cpp_imgui_render(void) {
     }
 
     if (ImGui::CollapsingHeader("PPU")) {
-        ImGui::Text("X position: %d", ppu.drawing_x);
-        ImGui::Text("Y position: %d", ppu.drawing_y);
+        ImGui::Text("X drawing position: %d", ppu.drawing_x);
+        ImGui::Text("Y drawing position: %d", ppu.drawing_y);
+        ImGui::Text("X scroll: %d", ppu.scroll_x);
+        ImGui::Text("Y scroll: %d", ppu.scroll_y);
+    }
+
+    if (ImGui::CollapsingHeader("Tilemaps")) {
+        ImGui::BeginTable("##tilemaplower", 32,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                              ImGuiTableFlags_ScrollX |
+                              ImGuiTableFlags_ScrollY);
+        for (uint8_t i = 0; i < 32; i++) {
+            ImGui::TableNextRow();
+            for (uint8_t j = 0; j < 32; j++) {
+                ImGui::TableNextColumn();
+                ImGui::Text("0x%02x", cpu.memory.vram[0x1800 + i * 32 + j]);
+            }
+        }
+        ImGui::EndTable();
+
+        ImGui::BeginTable("##tilemapupper", 32,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                              ImGuiTableFlags_ScrollX |
+                              ImGuiTableFlags_ScrollY);
+        for (uint8_t i = 0; i < 32; i++) {
+            ImGui::TableNextRow();
+            for (uint8_t j = 0; j < 32; j++) {
+                ImGui::TableNextColumn();
+                ImGui::Text("0x%02x", cpu.memory.vram[0x1c00 + i * 32 + j]);
+            }
+        }
+        ImGui::EndTable();
+    }
+
+    if (ImGui::CollapsingHeader("OAM")) {
+        ImGui::BeginTable("##oam", 4,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg);
+        ImGui::TableNextColumn();
+        ImGui::Text("X");
+        ImGui::TableNextColumn();
+        ImGui::Text("Y");
+        ImGui::TableNextColumn();
+        ImGui::Text("Tile");
+        ImGui::TableNextColumn();
+        ImGui::Text("Attr");
+        ImGui::TableNextRow();
+        for (uint8_t i = 0; i < 40; i++) {
+            ImGui::TableNextColumn();
+            ImGui::Text("0x%02x", cpu.memory.oam[i].x);
+            ImGui::TableNextColumn();
+            ImGui::Text("0x%02x", cpu.memory.oam[i].y);
+            ImGui::TableNextColumn();
+            ImGui::Text("0x%02x", cpu.memory.oam[i].tile);
+            ImGui::TableNextColumn();
+            ImGui::Text("0x%02x", cpu.memory.oam[i].attr);
+
+            if (i != 39)
+                ImGui::TableNextRow();
+        }
+        ImGui::EndTable();
     }
 
     if (ImGui::CollapsingHeader("APU")) {
+        ImGui::Text("Master enable: %s", apu.audio_enable ? "true" : "false");
         ImGui::BeginTabBar("Channels");
         if (ImGui::BeginTabItem("1")) {
             ImGui::Text("Enabled: %s", apu.ch1.enable ? "true" : "false");
@@ -460,6 +537,33 @@ void cpp_imgui_render(void) {
             ImGui::Text("Envelope pace: %d", apu.ch2.envelope_pace);
             ImGui::Text("Envelope direction: %s",
                         apu.ch2.envelope_dir ? "INC" : "DEC");
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("3")) {
+            ImGui::Text("Enabled: %s", apu.ch3.enable ? "true" : "false");
+            ImGui::Text("DAC on: %s", apu.ch3.dac_on ? "true" : "false");
+            ImGui::Text("Period low: %d", apu.ch3.period_low);
+            ImGui::Text("Period high: %d", apu.ch3.period_high);
+            ImGui::Text("Frequency: %d Hz", apu.ch3.frequency);
+            ImGui::Text("Volume: %0.4f", apu.ch3.volume / 4.f);
+            float wave_table_adj[32] = {0};
+            for (uint8_t i = 0; i < 16; i++) {
+                wave_table_adj[i * 2] = (apu.ch3.wave_ram[i] >> 4) / 15.f;
+                wave_table_adj[i * 2 + 1] = (apu.ch3.wave_ram[i] & 0xf) / 15.f;
+            }
+            ImGui::PlotHistogram("##hist", wave_table_adj, 32);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("4")) {
+            ImGui::Text("Enabled: %s", apu.ch4.enable ? "true" : "false");
+            ImGui::Text("Clock shift: %d", apu.ch4.clock_shift);
+            ImGui::Text("Clock divider: %0.4f", apu.ch4.clock_divider);
+            ImGui::Text("LFSR refresh rate: %f Hz",
+                        262144.f / (apu.ch4.clock_divider *
+                                    pow(2, apu.ch4.clock_shift)));
+            ImGui::Text("Using %s LFSR",
+                        apu.ch4.narrow_lfsr ? "narrow" : "wide");
+            ImGui::Text("LFSR: %016b", apu.ch4.lfsr);
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
@@ -536,7 +640,7 @@ void cpp_imgui_render(void) {
         ImGui::EndTable();
     }
 
-    if(ImGui::Button("Quit & Dump")) {
+    if (ImGui::Button("Quit & Dump")) {
         exit(0);
     }
 

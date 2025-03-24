@@ -1,8 +1,8 @@
-#include "apu.h"
 #include "carts/mbc1.h"
 #include "carts/nocart.h"
 #include "ppu.h"
 #include "types.h"
+#include <threads.h>
 
 extern cpu_t cpu;
 extern ppu_t ppu;
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
     cpu.memory.finished_boot = true;
     #endif
 
-    apu_init();
+    // apu_init();
     on_exit(exit_cb, NULL);
     ui();
 
