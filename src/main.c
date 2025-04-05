@@ -1,3 +1,4 @@
+#include "apu.h"
 #include "carts/mbc1.h"
 #include "carts/nocart.h"
 #include "ppu.h"
@@ -13,9 +14,20 @@ void exit_cb(int code, void *param) {
     (void)param;
 
     printf("Trace:\n");
-    for(uint16_t idx = cpu.prev_idx+1; idx != cpu.prev_idx; idx++) {
+    for (uint16_t idx = cpu.prev_idx + 1; idx != cpu.prev_idx; idx++) {
         printf("0x%04x: 0x%02x\n", cpu.prev_pc[idx], cpu.prev_opcode[idx]);
     }
+
+    printf("Used opcodes: \n");
+    for (uint16_t i = 0; i < 256; i++) {
+        if (cpu.used[i])
+            printf("%02x, ", i);
+    }
+    for (uint16_t i = 0; i < 256; i++) {
+        if (cpu.prefixed_used[i])
+            printf("cb%02x, ", i);
+    }
+    printf("\n");
 }
 
 int main(int argc, char **argv) {
@@ -50,7 +62,7 @@ int main(int argc, char **argv) {
         break;
     }
 
-    #ifdef SKIP_BOOT
+#ifdef SKIP_BOOT
     cpu.a = 0x01;
     cpu.f = 0xb0;
     cpu.b = 0x00;
@@ -62,9 +74,11 @@ int main(int argc, char **argv) {
     cpu.sp = 0xfffe;
     cpu.pc = 0x100;
     cpu.memory.finished_boot = true;
-    #endif
+#endif
 
-    // apu_init();
+    thrd_t apu_thread;
+    thrd_create(&apu_thread, apu_init, NULL);
+    thrd_detach(apu_thread);
     on_exit(exit_cb, NULL);
     ui();
 

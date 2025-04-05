@@ -10,24 +10,24 @@ extern ppu_t ppu;
 static uint32_t colors[] = {0xffffffff, 0xffc8c8c8, 0xff828282, 0xff000000};
 
 void set_bg_palette(uint8_t value) {
-    ppu.bg_color[0] = (value >> 0) & 0b11;
-    ppu.bg_color[1] = (value >> 2) & 0b11;
-    ppu.bg_color[2] = (value >> 4) & 0b11;
-    ppu.bg_color[3] = (value >> 6) & 0b11;
+    ppu.bg_color[0] = colors[(value >> 0) & 0b11];
+    ppu.bg_color[1] = colors[(value >> 2) & 0b11];
+    ppu.bg_color[2] = colors[(value >> 4) & 0b11];
+    ppu.bg_color[3] = colors[(value >> 6) & 0b11];
 }
 
 void set_obj_palette_1(uint8_t value) {
-    ppu.obj_color_1[0] = (value >> 0) & 0b11;
-    ppu.obj_color_1[1] = (value >> 2) & 0b11;
-    ppu.obj_color_1[2] = (value >> 4) & 0b11;
-    ppu.obj_color_1[3] = (value >> 6) & 0b11;
+    ppu.obj_color_1[0] = colors[(value >> 0) & 0b11];
+    ppu.obj_color_1[1] = colors[(value >> 2) & 0b11];
+    ppu.obj_color_1[2] = colors[(value >> 4) & 0b11];
+    ppu.obj_color_1[3] = colors[(value >> 6) & 0b11];
 }
 
 void set_obj_palette_2(uint8_t value) {
-    ppu.obj_color_2[0] = (value >> 0) & 0b11;
-    ppu.obj_color_2[1] = (value >> 2) & 0b11;
-    ppu.obj_color_2[2] = (value >> 4) & 0b11;
-    ppu.obj_color_2[3] = (value >> 6) & 0b11;
+    ppu.obj_color_2[0] = colors[(value >> 0) & 0b11];
+    ppu.obj_color_2[1] = colors[(value >> 2) & 0b11];
+    ppu.obj_color_2[2] = colors[(value >> 4) & 0b11];
+    ppu.obj_color_2[3] = colors[(value >> 6) & 0b11];
 }
 
 void lcd_control(uint8_t value) {
@@ -93,27 +93,33 @@ static uint8_t get_window_tile_index(uint8_t x, uint8_t y) {
     return read_8(base + 32 * (y / 8) + (x / 8));
 }
 
-static uint8_t get_object_tile_color(uint8_t tile_index, uint8_t x, uint8_t y) {
+static uint32_t get_object_tile_color(uint8_t tile_index, uint8_t x, uint8_t y,
+                                     uint8_t palette) {
     ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
     ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
+    ASSERT(palette < 2, "Tile palette out of bounds, found %d", palette);
     uint16_t base = 0x8000;
     uint16_t sprite_base_address = base + 16 * tile_index;
     uint16_t line = read_16(sprite_base_address + y * 2);
-    return ((HIBYTE(line) & (1 << (7 - x))) != 0) +
-           2 * ((LOBYTE(line) & (1 << (7 - x))) != 0);
+    uint8_t col_idx = 2 * ((HIBYTE(line) & (1 << (7 - x))) != 0) +
+                      ((LOBYTE(line) & (1 << (7 - x))) != 0);
+    if (col_idx == 0)
+        return 0;
+    return palette ? ppu.obj_color_2[col_idx] : ppu.obj_color_1[col_idx];
 }
 
-static uint8_t get_window_tile_color(uint8_t tile_index, uint8_t x, uint8_t y) {
+static uint32_t get_window_tile_color(uint8_t tile_index, uint8_t x, uint8_t y) {
     ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
     ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
     uint16_t base = ppu.bg_window_tile_data_location
                         ? (tile_index < 128 ? 0x8000 : 0x8800)
                         : (tile_index < 128 ? 0x9000 : 0x8800);
 
-    uint16_t sprite_base_address = base + 16 * tile_index;
+    uint16_t sprite_base_address = base + 16 * (tile_index % 128);
     uint16_t line = read_16(sprite_base_address + y * 2);
-    return ((HIBYTE(line) & (1 << (7 - x))) != 0) +
-           2 * ((LOBYTE(line) & (1 << (7 - x))) != 0);
+    uint8_t col_idx = 2 * ((HIBYTE(line) & (1 << (7 - x))) != 0) +
+                      ((LOBYTE(line) & (1 << (7 - x))) != 0);
+    return ppu.bg_color[col_idx];
 }
 
 static void set_pixel(uint8_t x, uint8_t y, uint32_t value) {
@@ -123,10 +129,10 @@ static void set_pixel(uint8_t x, uint8_t y, uint32_t value) {
 static void set_background_pixel(uint8_t x, uint8_t y) {
     uint8_t tile_index =
         get_window_tile_index(x + ppu.scroll_x, y + ppu.scroll_y);
-    uint8_t pixel = get_window_tile_color(tile_index, (x + ppu.scroll_x) % 8,
+    uint32_t pixel = get_window_tile_color(tile_index, (x + ppu.scroll_x) % 8,
                                           (y + ppu.scroll_y) % 8);
 
-    set_pixel(x, y, colors[pixel]);
+    set_pixel(x, y, pixel);
 }
 
 static void try_step_ppu(void) {
@@ -164,13 +170,18 @@ static void try_step_ppu(void) {
                                     cpu.memory.oam[i].x - 1 - screen_x;
                                 uint8_t obj_y =
                                     cpu.memory.oam[i].y - 9 - screen_y;
-                                    if(!(cpu.memory.oam[i].attr & 0x10)) obj_x = 7 - obj_x;
-                                    if(!(cpu.memory.oam[i].attr & 0x20)) obj_y = 7 - obj_y;
+                                if (!(cpu.memory.oam[i].attr & 0x20))
+                                    obj_x = 7 - obj_x;
+                                if (!(cpu.memory.oam[i].attr & 0x40))
+                                    obj_y = 7 - obj_y;
 
-                                set_pixel(
-                                    screen_x, screen_y,
-                                    colors[get_object_tile_color(
-                                        cpu.memory.oam[i].tile, obj_x, obj_y)]);
+                                uint32_t col_idx = get_object_tile_color(
+                                    cpu.memory.oam[i].tile, obj_x, obj_y,
+                                    (cpu.memory.oam[i].attr & 0x10) != 0 ? 1
+                                                                         : 0);
+                                if (col_idx != 0)
+                                    set_pixel(screen_x, screen_y,
+                                              col_idx);
                             }
                         }
                     }

@@ -1,6 +1,4 @@
-#include "apu.h"
 #include <cmath>
-#include <thread>
 #define NO_FONT_AWESOME
 #include "cpu.h"
 #include "imgui.h"
@@ -322,11 +320,7 @@ static int32_t rom_page = 0;
 static uint16_t poke_location = 0;
 static uint8_t poke_value = 0;
 
-void cpp_init(void) {
-    rlImGuiSetup(true);
-    std::thread t = std::thread{apu_init};
-    t.detach();
-}
+void cpp_init(void) { rlImGuiSetup(true); }
 
 void cpp_imgui_render(void) {
     rlImGuiBegin();
@@ -445,6 +439,9 @@ void cpp_imgui_render(void) {
         ImGui::Text("Timer  %d%d", cpu.memory.timer_ie, cpu.memory.timer_if);
         ImGui::Text("Serial %d%d", cpu.memory.serial_ie, cpu.memory.serial_if);
         ImGui::Text("Joypad %d%d", cpu.memory.joypad_ie, cpu.memory.joypad_if);
+        ImGui::NewLine();
+        ImGui::Text("DIV Timer: 0x%02x", cpu.div);
+        ImGui::Text("A Timer: 0x%02x", cpu.memory.timer_counter);
     }
 
     if (ImGui::CollapsingHeader("PPU")) {
@@ -452,34 +449,57 @@ void cpp_imgui_render(void) {
         ImGui::Text("Y drawing position: %d", ppu.drawing_y);
         ImGui::Text("X scroll: %d", ppu.scroll_x);
         ImGui::Text("Y scroll: %d", ppu.scroll_y);
+        ImGui::Text("BG Tilemap start: %s",
+                    ppu.bg_tile_map_location ? "0x9c00" : "0x9800");
+        ImGui::Text("BG/WIN Tile Data start: %s",
+                    ppu.bg_window_tile_data_location ? "0x8000" : "0x8800");
+        ImGui::Text("WIN Tilemap start: %s",
+                    ppu.window_tile_map_location ? "0x9c00" : "0x9800");
     }
 
     if (ImGui::CollapsingHeader("Tilemaps")) {
-        ImGui::BeginTable("##tilemaplower", 32,
-                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-                              ImGuiTableFlags_ScrollX |
-                              ImGuiTableFlags_ScrollY);
-        for (uint8_t i = 0; i < 32; i++) {
-            ImGui::TableNextRow();
-            for (uint8_t j = 0; j < 32; j++) {
-                ImGui::TableNextColumn();
-                ImGui::Text("0x%02x", cpu.memory.vram[0x1800 + i * 32 + j]);
-            }
-        }
-        ImGui::EndTable();
+        if (ImGui::BeginTabBar("##tilemaps")) {
+            if (ImGui::BeginTabItem("0x9800")) {
+                if (ImGui::BeginTable("##tilemaplower", 32,
+                                      ImGuiTableFlags_Borders |
+                                          ImGuiTableFlags_RowBg |
+                                          ImGuiTableFlags_ScrollX |
+                                          ImGuiTableFlags_ScrollY)) {
 
-        ImGui::BeginTable("##tilemapupper", 32,
-                          ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-                              ImGuiTableFlags_ScrollX |
-                              ImGuiTableFlags_ScrollY);
-        for (uint8_t i = 0; i < 32; i++) {
-            ImGui::TableNextRow();
-            for (uint8_t j = 0; j < 32; j++) {
-                ImGui::TableNextColumn();
-                ImGui::Text("0x%02x", cpu.memory.vram[0x1c00 + i * 32 + j]);
+                    for (uint8_t i = 0; i < 32; i++) {
+                        ImGui::TableNextRow();
+                        for (uint8_t j = 0; j < 32; j++) {
+                            ImGui::TableNextColumn();
+                            ImGui::Text("0x%02x",
+                                        cpu.memory.vram[0x1800 + i * 32 + j]);
+                        }
+                    }
+                    ImGui::EndTable();
+                }
+                ImGui::EndTabItem();
             }
+
+            if (ImGui::BeginTabItem("0x9c00")) {
+                if (ImGui::BeginTable("##tilemapupper", 32,
+                                      ImGuiTableFlags_Borders |
+                                          ImGuiTableFlags_RowBg |
+                                          ImGuiTableFlags_ScrollX |
+                                          ImGuiTableFlags_ScrollY)) {
+
+                    for (uint8_t i = 0; i < 32; i++) {
+                        ImGui::TableNextRow();
+                        for (uint8_t j = 0; j < 32; j++) {
+                            ImGui::TableNextColumn();
+                            ImGui::Text("0x%02x",
+                                        cpu.memory.vram[0x1c00 + i * 32 + j]);
+                        }
+                    }
+                    ImGui::EndTable();
+                }
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
         }
-        ImGui::EndTable();
     }
 
     if (ImGui::CollapsingHeader("OAM")) {

@@ -20,11 +20,14 @@ static float square_wave(float x, duty_cycle_t dc) {
 static void ch1_cb(void *buffer, uint32_t sample_count) {
     static float square_idx = 0.f;
     static float envelope_timer = 0.f;
+    static float length_timer = 0.f;
 
     // not really part of the audio channel, but might as well make use of the
     // timing functionality
     static float timer_timer = 0.f;
     static float div_timer = 0.f;
+
+    // printf("%f\n", div_timer);
 
     int16_t *out = (int16_t *)buffer;
 
@@ -54,12 +57,24 @@ static void ch1_cb(void *buffer, uint32_t sample_count) {
             }
         }
 
+        if(apu.ch1.length_enable) {
+            length_timer += 1.f / SAMPLE_RATE;
+            if(length_timer > 1.f / 256.f) {
+                apu.ch1.current_length_timer++;
+                if(apu.ch1.current_length_timer >= 64) {
+                    apu.ch1.enable = false;
+                    apu.ch1.length_enable = false;
+                }
+                length_timer -= 1.f / 256.f;
+            }
+        }
+
         if (cpu.memory.timer_enable) {
             static uint16_t increment_intervals[] = {256, 4, 16, 64};
             timer_timer += 1.f / SAMPLE_RATE;
             if (timer_timer >
                 (increment_intervals[cpu.memory.timer_clock_select] /
-                 (CPU_FREQ / 4))) {
+                 (CPU_FREQ / 4.f))) {
                 if (++cpu.memory.timer_counter == 0) {
                     cpu.memory.timer_if = true;
                     cpu.memory.timer_counter = cpu.memory.timer_modulo;
@@ -67,12 +82,12 @@ static void ch1_cb(void *buffer, uint32_t sample_count) {
 
                 timer_timer -=
                     increment_intervals[cpu.memory.timer_clock_select] /
-                    (CPU_FREQ / 4);
+                    (CPU_FREQ / 4.f);
             }
         }
 
         div_timer += 1.f / SAMPLE_RATE;
-        while(div_timer > 1.f / 16384.f) {
+        while(div_timer >= 1.f / 16384.f) {
             cpu.div++;
             div_timer -= 1.f / 16384.f;
         }
@@ -82,6 +97,7 @@ static void ch1_cb(void *buffer, uint32_t sample_count) {
 static void ch2_cb(void *buffer, uint32_t sample_count) {
     static float square_idx = 0.f;
     static float envelope_timer = 0.f;
+    static float length_timer = 0.f;
     int16_t *out = (int16_t *)buffer;
 
     ASSERT(apu.ch2.wave_duty < 4,
@@ -109,11 +125,24 @@ static void ch2_cb(void *buffer, uint32_t sample_count) {
                 envelope_timer -= (1.f / 64.f) * apu.ch2.envelope_pace;
             }
         }
+
+        if(apu.ch2.length_enable) {
+            length_timer += 1.f / SAMPLE_RATE;
+            if(length_timer > 1.f / 256.f) {
+                apu.ch2.current_length_timer++;
+                if(apu.ch2.current_length_timer >= 64) {
+                    apu.ch2.enable = false;
+                    apu.ch2.length_enable = false;
+                }
+                length_timer -= 1.f / 256.f;
+            }
+        }
     }
 }
 
 static void ch3_cb(void *buffer, uint32_t sample_count) {
     static float table_idx = 1.f;
+    static float length_timer = 0.f;
     int16_t *out = (int16_t *)buffer;
 
     for (uint32_t i = 0; i < sample_count; i++) {
@@ -127,6 +156,18 @@ static void ch3_cb(void *buffer, uint32_t sample_count) {
         table_idx += (32 * apu.ch3.frequency / (float)SAMPLE_RATE);
         if (table_idx >= 32)
             table_idx = 0;
+
+        if(apu.ch3.length_enable) {
+            length_timer += 1.f / SAMPLE_RATE;
+            if(length_timer > 1.f / 256.f) {
+                apu.ch3.current_length_timer++;
+                if(apu.ch3.current_length_timer >= 256) {
+                    apu.ch3.enable = false;
+                    apu.ch3.length_enable = false;
+                }
+                length_timer -= 1.f / 256.f;
+            }
+        }
     }
 }
 
@@ -171,8 +212,9 @@ static void ch4_cb(void *buffer, uint32_t sample_count) {
     }
 }
 
-void apu_init(void) {
-    SetTraceLogLevel(LOG_ERROR);
+int32_t apu_init(void* _) {
+    (void)_;
+    SetTraceLogLevel(LOG_ALL);
     InitAudioDevice();
     SetAudioStreamBufferSizeDefault(1024);
 
@@ -192,6 +234,8 @@ void apu_init(void) {
     apu.ch4.handle = LoadAudioStream(SAMPLE_RATE, 16, 1);
     SetAudioStreamCallback(apu.ch4.handle, ch4_cb);
     PlayAudioStream(apu.ch4.handle);
+
+    return 0;
 }
 
 void audio_master_control(uint8_t val) {
@@ -244,7 +288,7 @@ void ch1_period_high_control(uint8_t val) {
     apu.ch1.length_enable = val & 0x40;
     if (val & 0x80) {
         apu.ch1.enable = true;
-        // TODO: reset length timer if expired
+        if(apu.ch1.current_length_timer >= 64) apu.ch1.current_length_timer = apu.ch1.initial_length_timer;
         apu.ch1.frequency =
             131072 / (2048 - TO_U16(apu.ch1.period_low, apu.ch1.period_high));
         // TODO: reset envelope timer
@@ -270,7 +314,7 @@ void ch2_period_high_control(uint8_t val) {
     apu.ch2.length_enable = val & 0x40;
     if (val & 0x80) {
         apu.ch2.enable = true;
-        // TODO: reset length timer if expired
+        if(apu.ch2.current_length_timer >= 64) apu.ch2.current_length_timer = apu.ch2.initial_length_timer;
         apu.ch2.frequency =
             131072 / (2048 - TO_U16(apu.ch2.period_low, apu.ch2.period_high));
         // TODO: reset envelope timer
@@ -285,6 +329,7 @@ void ch3_period_high_control(uint8_t val) {
     apu.ch3.length_enable = val & 0x40;
     if (val & 0x80) {
         apu.ch3.enable = true;
+        if(apu.ch3.current_length_timer >= 256) apu.ch3.current_length_timer = apu.ch3.initial_length_timer;
         apu.ch3.frequency =
             65536 / (2048 - TO_U16(apu.ch3.period_low, apu.ch3.period_high));
 

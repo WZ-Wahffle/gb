@@ -232,11 +232,11 @@ static void r16mem_write(r16_mem_t dst, uint8_t val) {
 static uint16_t r16stk_read(r16_stk_t src) {
     switch (src) {
     case BC_STK:
-        return TO_U16(cpu.c, cpu.b);
+        return r16_read(BC);
     case DE_STK:
-        return TO_U16(cpu.e, cpu.d);
+        return r16_read(DE);
     case HL_STK:
-        return TO_U16(cpu.l, cpu.h);
+        return r16_read(HL);
     case AF_STK:
         return TO_U16(cpu.f, cpu.a);
     default:
@@ -287,10 +287,12 @@ void execute(void) {
     cpu.prev_opcode[cpu.prev_idx] = opcode;
     cpu.prev_pc[cpu.prev_idx] = cpu.pc - 1;
     cpu.prev_idx++;
+    cpu.used[opcode] = true;
 
     if (cpu.opcode == 0xcb) {
         cpu.opcode = next_8();
         opcode = cpu.opcode;
+        cpu.prefixed_used[opcode] = true;
         cpu.remaining_cycles -= extended_lookup[opcode % 8] * 4;
         if (cpu.watching_opcode && opcode == cpu.watch_opcode)
             cpu.watch_opcode_interrupt = true;
@@ -349,10 +351,16 @@ void execute(void) {
                 set_status_bit(C_STATUS, r8_read(opcode & 0b111) & 0x80);
                 r8_write(opcode & 0b111, result);
             } break;
-            case 5:
+            case 5: {
                 // sra r8
-                TODO("sra r8");
+                uint8_t result = r8_read(opcode & 0b111) / 2;
+                set_status_bit(Z_STATUS, result == 0);
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS, false);
+                set_status_bit(C_STATUS, r8_read(opcode & 0b111) & 1);
+                r8_write(opcode & 0b111, result | ((result * 2) & 0x80));
                 break;
+            }
             case 6: {
                 // swap r8
                 uint8_t operand = r8_read(opcode & 0b111);
@@ -550,10 +558,11 @@ void execute(void) {
         case 2:
             switch ((opcode >> 3) & 0b111) {
             case 0: {
+                // add a, r8
                 uint8_t operand = r8_read(opcode & 0b111);
                 uint8_t result = cpu.a + operand;
                 set_status_bit(Z_STATUS, result == 0);
-                set_status_bit(N_STATUS, true);
+                set_status_bit(N_STATUS, false);
                 set_status_bit(H_STATUS, (operand & 0xf) + (cpu.a & 0xf) > 0xf);
                 set_status_bit(C_STATUS, operand + cpu.a > 0xff);
                 cpu.a = result;
@@ -563,7 +572,7 @@ void execute(void) {
                 uint8_t operand = r8_read(opcode & 0b111);
                 uint8_t result = cpu.a + operand + get_status_bit(C_STATUS);
                 set_status_bit(Z_STATUS, result == 0);
-                set_status_bit(N_STATUS, true);
+                set_status_bit(N_STATUS, false);
                 set_status_bit(H_STATUS, (operand & 0xf) + (cpu.a & 0xf) +
                                                  get_status_bit(C_STATUS) >
                                              0xf);
@@ -586,13 +595,14 @@ void execute(void) {
             }
             case 3: {
                 // sbc a, r8
-                uint8_t operand =
-                    r8_read(opcode & 0b111) + get_status_bit(C_STATUS);
-                uint8_t result = cpu.a - operand;
+                uint8_t carry = get_status_bit(C_STATUS) ? 1 : 0;
+                uint8_t operand = r8_read(opcode & 0b111);
+                uint8_t result = cpu.a - operand - carry;
                 set_status_bit(Z_STATUS, result == 0);
                 set_status_bit(N_STATUS, true);
-                set_status_bit(H_STATUS, (operand & 0xf) > (cpu.a & 0xf));
-                set_status_bit(C_STATUS, operand > cpu.a);
+                set_status_bit(H_STATUS,
+                               (cpu.a & 0xf) < (operand & 0xf) + carry);
+                set_status_bit(C_STATUS, cpu.a < operand + carry);
                 cpu.a = result;
                 break;
             }

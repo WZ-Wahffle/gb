@@ -113,6 +113,8 @@ typedef struct {
     uint16_t prev_pc[0x10000];
     uint16_t prev_idx;
     uint8_t prev_opcode[0x10000];
+    bool used[256];
+    bool prefixed_used[256];
 
     uint16_t watch_addr;
     bool watching_addr;
@@ -126,9 +128,9 @@ typedef struct {
 
 typedef struct {
     uint8_t mode;
-    uint8_t bg_color[4];
-    uint8_t obj_color_1[4];
-    uint8_t obj_color_2[4];
+    uint32_t bg_color[4];
+    uint32_t obj_color_1[4];
+    uint32_t obj_color_2[4];
     double remaining_cycles;
     uint8_t scroll_x, scroll_y;
     bool ppu_enable;
@@ -160,6 +162,7 @@ typedef struct {
 
     uint8_t wave_duty;
     uint8_t initial_length_timer;
+    uint16_t current_length_timer;
 
     uint8_t envelope_initial_volume;
     bool envelope_dir;
@@ -183,6 +186,7 @@ typedef struct {
     bool dac_on;
 
     uint8_t initial_length_timer;
+    uint16_t current_length_timer;
 
     uint8_t output_level;
     uint8_t volume;
