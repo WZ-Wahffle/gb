@@ -43,6 +43,8 @@ int main(int argc, char **argv) {
     fread(&rom_size, 1, 1, f);
     fread(&ram_size, 1, 1, f);
     fseek(f, 0, SEEK_SET);
+    printf("Cartridge Type %d\n", cart_type);
+    printf("ROM Size %d Bytes\n", 32768 * (1 << rom_size));
 
     switch (cart_type) {
     case 0:

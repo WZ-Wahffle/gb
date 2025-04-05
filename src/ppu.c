@@ -50,7 +50,7 @@ void lcd_status_write(uint8_t value) {
 
 static void try_step_cpu(void) {
     if (cpu.remaining_cycles > 0) {
-        execute();
+        uint8_t elapsed_cycles = execute();
         check_interrupts();
         if (cpu.pc == cpu.breakpoint) {
             cpu.state = STOPPED;
@@ -66,22 +66,31 @@ static void try_step_cpu(void) {
             cpu.watch_opcode_interrupt = false;
             cpu.state = STOPPED;
         }
-    }
-}
 
-static void catch_up_cpu(double cycles_to_add) {
-    if (cpu.state == RUNNING || cpu.state == STEPPED) {
-        cpu.remaining_cycles += cycles_to_add;
-        while (cpu.remaining_cycles > 0) {
-            try_step_cpu();
-            if (cpu.state == STEPPED) {
-                cpu.state = STOPPED;
-                break;
+        static float timer_timer = 0.f;
+        static float div_timer = 0.f;
+
+        if (cpu.memory.timer_enable) {
+            static uint16_t increment_intervals[] = {256, 4, 16, 64};
+            timer_timer += elapsed_cycles / CPU_FREQ;
+            if (timer_timer >
+                (increment_intervals[cpu.memory.timer_clock_select] /
+                 (CPU_FREQ / 4.f))) {
+                if (++cpu.memory.timer_counter == 0) {
+                    cpu.memory.timer_if = true;
+                    cpu.memory.timer_counter = cpu.memory.timer_modulo;
+                }
+
+                timer_timer -=
+                    increment_intervals[cpu.memory.timer_clock_select] /
+                    (CPU_FREQ / 4.f);
             }
-            if (cpu.pc == cpu.breakpoint) {
-                cpu.state = STOPPED;
-                break;
-            }
+        }
+
+        div_timer += elapsed_cycles / CPU_FREQ;
+        while (div_timer >= 1.f / 16384.f) {
+            cpu.div++;
+            div_timer -= 1.f / 16384.f;
         }
     }
 }
@@ -94,7 +103,7 @@ static uint8_t get_window_tile_index(uint8_t x, uint8_t y) {
 }
 
 static uint32_t get_object_tile_color(uint8_t tile_index, uint8_t x, uint8_t y,
-                                     uint8_t palette) {
+                                      uint8_t palette) {
     ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
     ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
     ASSERT(palette < 2, "Tile palette out of bounds, found %d", palette);
@@ -108,7 +117,8 @@ static uint32_t get_object_tile_color(uint8_t tile_index, uint8_t x, uint8_t y,
     return palette ? ppu.obj_color_2[col_idx] : ppu.obj_color_1[col_idx];
 }
 
-static uint32_t get_window_tile_color(uint8_t tile_index, uint8_t x, uint8_t y) {
+static uint32_t get_window_tile_color(uint8_t tile_index, uint8_t x,
+                                      uint8_t y) {
     ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
     ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
     uint16_t base = ppu.bg_window_tile_data_location
@@ -130,7 +140,7 @@ static void set_background_pixel(uint8_t x, uint8_t y) {
     uint8_t tile_index =
         get_window_tile_index(x + ppu.scroll_x, y + ppu.scroll_y);
     uint32_t pixel = get_window_tile_color(tile_index, (x + ppu.scroll_x) % 8,
-                                          (y + ppu.scroll_y) % 8);
+                                           (y + ppu.scroll_y) % 8);
 
     set_pixel(x, y, pixel);
 }
@@ -180,8 +190,7 @@ static void try_step_ppu(void) {
                                     (cpu.memory.oam[i].attr & 0x10) != 0 ? 1
                                                                          : 0);
                                 if (col_idx != 0)
-                                    set_pixel(screen_x, screen_y,
-                                              col_idx);
+                                    set_pixel(screen_x, screen_y, col_idx);
                             }
                         }
                     }

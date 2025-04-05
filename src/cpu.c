@@ -264,7 +264,8 @@ static void r16stk_write(r16_stk_t dst, uint16_t val) {
     }
 }
 
-void execute(void) {
+uint8_t execute(void) {
+    double old_cycle_count = cpu.remaining_cycles;
     if (cpu.halted) {
         cpu.remaining_cycles -= 4;
 
@@ -275,7 +276,7 @@ void execute(void) {
             (cpu.memory.joypad_ie && cpu.memory.joypad_if)) {
             cpu.halted = false;
         }
-        return;
+        return old_cycle_count - cpu.remaining_cycles;
     }
 
     cpu.opcode = next_8();
@@ -727,14 +728,21 @@ void execute(void) {
             else if (opcode == 0b11101010)
                 write_8(next_16(), cpu.a);
             else if (opcode == 0b11110010)
-                TODO("ldh a, [c]");
+                cpu.a = read_8(0xff00 + cpu.c);
             else if (opcode == 0b11110000)
                 cpu.a = read_8(0xff00 + next_8());
             else if (opcode == 0b11111010)
                 cpu.a = read_8(next_16());
-            else if (opcode == 0b11101000)
-                TODO("add sp, imm8");
-            else if (opcode == 0b11111000) {
+            else if (opcode == 0b11101000) {
+                int16_t operand = (int8_t)next_8();
+                uint16_t result = cpu.sp + operand;
+                set_status_bit(Z_STATUS, false);
+                set_status_bit(N_STATUS, false);
+                set_status_bit(H_STATUS,
+                               (cpu.sp & 0xfff) + (operand & 0xfff) > 0xfff);
+                set_status_bit(C_STATUS, cpu.sp + operand > 0xffff);
+                cpu.sp = result;
+            } else if (opcode == 0b11111000) {
                 int16_t operand = (int8_t)next_8();
                 uint16_t result = cpu.sp + operand;
                 set_status_bit(Z_STATUS, false);
@@ -788,6 +796,8 @@ void execute(void) {
         default:
             UNREACHABLE_SWITCH(opcode >> 6);
         }
+
+    return old_cycle_count - cpu.remaining_cycles;
 }
 
 void check_interrupts(void) {

@@ -241,6 +241,9 @@ void mmu_write(uint16_t addr, uint8_t value) {
         case 0xff43:
             ppu.scroll_x = value;
             break;
+        case 0xff45:
+            ppu.lyc = value;
+            break;
         case 0xff46: {
             uint16_t start = value * 0x100;
             for (uint8_t i = 0; i < 40; i++) {

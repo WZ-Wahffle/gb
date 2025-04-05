@@ -37,7 +37,7 @@ uint8_t mbc1_read(uint16_t addr) {
     if (addr < 0x4000) {
         return rom[addr];
     } else if (addr < 0x8000) {
-        uint16_t idx = rom_number * 0x4000 + addr;
+        uint16_t idx = rom_number * 0x4000 + (addr % 0x4000);
         ASSERT(idx < rom_size_bytes,
                "ROM access out of bounds, maximum size %d, adressed at %d",
                rom_size_bytes, idx);

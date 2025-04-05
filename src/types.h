@@ -209,6 +209,7 @@ typedef struct {
     bool enable;
 
     uint8_t initial_length_timer;
+    uint16_t current_length_timer;
 
     uint8_t envelope_initial_volume;
     bool envelope_dir;
