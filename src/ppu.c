@@ -98,6 +98,11 @@ static void try_step_cpu(void) {
 void *framebuffer = NULL;
 
 static uint8_t get_window_tile_index(uint8_t x, uint8_t y) {
+    uint16_t base = ppu.window_tile_map_location ? 0x9c00 : 0x9800;
+    return read_8(base + 32 * (y / 8) + (x / 8));
+}
+
+static uint8_t get_background_tile_index(uint8_t x, uint8_t y) {
     uint16_t base = ppu.bg_tile_map_location ? 0x9c00 : 0x9800;
     return read_8(base + 32 * (y / 8) + (x / 8));
 }
@@ -117,8 +122,8 @@ static uint32_t get_object_tile_color(uint8_t tile_index, uint8_t x, uint8_t y,
     return palette ? ppu.obj_color_2[col_idx] : ppu.obj_color_1[col_idx];
 }
 
-static uint32_t get_window_tile_color(uint8_t tile_index, uint8_t x,
-                                      uint8_t y) {
+static uint32_t get_background_window_tile_color(uint8_t tile_index, uint8_t x,
+                                                 uint8_t y) {
     ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
     ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
     uint16_t base = ppu.bg_window_tile_data_location
@@ -136,11 +141,24 @@ static void set_pixel(uint8_t x, uint8_t y, uint32_t value) {
     ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y] = value;
 }
 
+static uint32_t get_pixel(uint8_t x, uint8_t y) {
+    return ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y];
+}
+
+static void set_window_pixel(uint8_t x, uint8_t y) {
+    if (x < ppu.wx - 7 || y < ppu.wy)
+        return;
+    uint8_t tile_index = get_window_tile_index(x - (ppu.wx - 7), y - ppu.wy);
+    uint32_t pixel = get_background_window_tile_color(
+        tile_index, (x - (ppu.wx - 7)) % 8, (y - ppu.wy) % 8);
+    set_pixel(x, y, pixel);
+}
+
 static void set_background_pixel(uint8_t x, uint8_t y) {
     uint8_t tile_index =
-        get_window_tile_index(x + ppu.scroll_x, y + ppu.scroll_y);
-    uint32_t pixel = get_window_tile_color(tile_index, (x + ppu.scroll_x) % 8,
-                                           (y + ppu.scroll_y) % 8);
+        get_background_tile_index(x + ppu.scroll_x, y + ppu.scroll_y);
+    uint32_t pixel = get_background_window_tile_color(
+        tile_index, (x + ppu.scroll_x) % 8, (y + ppu.scroll_y) % 8);
 
     set_pixel(x, y, pixel);
 }
@@ -165,12 +183,40 @@ static void try_step_ppu(void) {
                 uint8_t screen_x = ppu.drawing_x - 80;
                 uint8_t screen_y = ppu.drawing_y;
                 if (ppu.bg_window_enable) {
-                    set_background_pixel(ppu.drawing_x - 80, ppu.drawing_y);
+                    set_background_pixel(screen_x, screen_y);
+                    if (ppu.window_enable) {
+                        set_window_pixel(screen_x, screen_y);
+                    }
                 }
                 if (ppu.enable_objects) {
                     for (uint8_t i = 0; i < 40; i++) {
                         if (ppu.large_objects) {
-                            TODO("large sprites");
+                            if (IN_INTERVAL(cpu.memory.oam[i].y - 1, screen_y,
+                                            screen_y + 16) &&
+                                IN_INTERVAL(cpu.memory.oam[i].x - 1, screen_x,
+                                            screen_x + 8)) {
+                                uint8_t obj_x =
+                                    cpu.memory.oam[i].x - 1 - screen_x;
+                                uint8_t obj_y =
+                                    cpu.memory.oam[i].y - 1 - screen_y;
+                                if (!(cpu.memory.oam[i].attr & 0x20))
+                                    obj_x = 7 - obj_x;
+                                if (!(cpu.memory.oam[i].attr & 0x40))
+                                    obj_y = 15 - obj_y;
+                                uint8_t tile_idx = cpu.memory.oam[i].tile;
+                                if (obj_y < 8)
+                                    tile_idx &= ~1;
+                                else
+                                    tile_idx |= 1;
+                                uint32_t col_idx = get_object_tile_color(
+                                    tile_idx, obj_x, obj_y % 8,
+                                    (cpu.memory.oam[i].attr & 0x10) != 0 ? 1
+                                                                         : 0);
+                                if (col_idx != 0 &&
+                                    !((cpu.memory.oam[i].attr & 0x80) != 0 &&
+                                      get_pixel(screen_x, screen_y) !=
+                                          ppu.bg_color[0]))set_pixel(screen_x, screen_y, col_idx);
+                            }
                         } else {
                             if (IN_INTERVAL(cpu.memory.oam[i].y - 9, screen_y,
                                             screen_y + 8) &&
@@ -189,7 +235,10 @@ static void try_step_ppu(void) {
                                     cpu.memory.oam[i].tile, obj_x, obj_y,
                                     (cpu.memory.oam[i].attr & 0x10) != 0 ? 1
                                                                          : 0);
-                                if (col_idx != 0)
+                                if (col_idx != 0 &&
+                                    !((cpu.memory.oam[i].attr & 0x80) != 0 &&
+                                      get_pixel(screen_x, screen_y) !=
+                                          ppu.bg_color[0]))
                                     set_pixel(screen_x, screen_y, col_idx);
                             }
                         }
@@ -311,7 +360,6 @@ void ui(void) {
 
     UnloadTexture(texture);
     UnloadImage(framebuffer_image);
-    free(framebuffer);
     cpp_end();
     CloseWindow();
 }

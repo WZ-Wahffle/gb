@@ -288,12 +288,10 @@ uint8_t execute(void) {
     cpu.prev_opcode[cpu.prev_idx] = opcode;
     cpu.prev_pc[cpu.prev_idx] = cpu.pc - 1;
     cpu.prev_idx++;
-    cpu.used[opcode] = true;
 
     if (cpu.opcode == 0xcb) {
         cpu.opcode = next_8();
         opcode = cpu.opcode;
-        cpu.prefixed_used[opcode] = true;
         cpu.remaining_cycles -= extended_lookup[opcode % 8] * 4;
         if (cpu.watching_opcode && opcode == cpu.watch_opcode)
             cpu.watch_opcode_interrupt = true;

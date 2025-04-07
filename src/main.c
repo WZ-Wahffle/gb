@@ -2,8 +2,8 @@
 #include "carts/mbc1.h"
 #include "carts/nocart.h"
 #include "ppu.h"
-#include "types.h"
 #include <threads.h>
+#include "ui.h"
 
 extern cpu_t cpu;
 extern ppu_t ppu;
@@ -15,19 +15,8 @@ void exit_cb(int code, void *param) {
 
     printf("Trace:\n");
     for (uint16_t idx = cpu.prev_idx + 1; idx != cpu.prev_idx; idx++) {
-        printf("0x%04x: 0x%02x\n", cpu.prev_pc[idx], cpu.prev_opcode[idx]);
+        printf("0x%04x: %s\n", cpu.prev_pc[idx], opcode_to_string(cpu.prev_opcode[idx]));
     }
-
-    printf("Used opcodes: \n");
-    for (uint16_t i = 0; i < 256; i++) {
-        if (cpu.used[i])
-            printf("%02x, ", i);
-    }
-    for (uint16_t i = 0; i < 256; i++) {
-        if (cpu.prefixed_used[i])
-            printf("cb%02x, ", i);
-    }
-    printf("\n");
 }
 
 int main(int argc, char **argv) {

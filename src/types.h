@@ -113,8 +113,6 @@ typedef struct {
     uint16_t prev_pc[0x10000];
     uint16_t prev_idx;
     uint8_t prev_opcode[0x10000];
-    bool used[256];
-    bool prefixed_used[256];
 
     uint16_t watch_addr;
     bool watching_addr;

@@ -67,6 +67,17 @@ uint8_t mmu_read(uint16_t addr) {
             return 0xf | (ppu.select_dpad << 4) | (ppu.select_buttons << 5);
         case 0xff04:
             return cpu.div;
+        case 0xff14:
+            return (apu.ch1.enable << 7) | (apu.ch1.length_enable << 6) |
+                   (apu.ch1.period_low);
+        case 0xff19:
+            return (apu.ch2.enable << 7) | (apu.ch2.length_enable << 6) |
+                   (apu.ch2.period_low);
+        case 0xff1e:
+            return (apu.ch3.enable << 7) | (apu.ch3.length_enable << 6) |
+                   (apu.ch3.period_low);
+        case 0xff23:
+            return (apu.ch3.enable << 7) | (apu.ch3.length_enable << 6);
         case 0xff4d:
         case 0xff4f:
         case 0xff68:
@@ -89,6 +100,10 @@ uint8_t mmu_read(uint16_t addr) {
             return ppu.scroll_y;
         case 0xff44:
             return ppu.ly;
+        case 0xff4a:
+            return ppu.wy;
+        case 0xff4b:
+            return ppu.wx;
         case 0xffff:
             return (cpu.memory.vblank_ie << 0) | (cpu.memory.lcd_ie << 1) |
                    (cpu.memory.timer_ie << 2) | (cpu.memory.serial_ie << 3) |

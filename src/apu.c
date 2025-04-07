@@ -21,6 +21,7 @@ static void ch1_cb(void *buffer, uint32_t sample_count) {
     static float square_idx = 0.f;
     static float envelope_timer = 0.f;
     static float length_timer = 0.f;
+    static float sweep_timer = 0.f;
 
     int16_t *out = (int16_t *)buffer;
 
@@ -61,6 +62,28 @@ static void ch1_cb(void *buffer, uint32_t sample_count) {
                     apu.ch1.length_enable = false;
                 }
                 length_timer -= 1.f / 256.f;
+            }
+        }
+
+        if (apu.ch1.sweep_step != 0) {
+            sweep_timer += 1.f / SAMPLE_RATE;
+            if (sweep_timer > apu.ch1.sweep_pace / 128.f) {
+                uint16_t new_period =
+                    TO_U16(apu.ch1.period_low, apu.ch1.period_high);
+                if (apu.ch1.sweep_direction) {
+                    new_period -= new_period / (1 << apu.ch1.sweep_step);
+                } else {
+                    new_period += new_period / (1 << apu.ch1.sweep_step);
+                }
+                if (!apu.ch1.sweep_direction && new_period > 0x7ff)
+                    apu.ch1.enable = false;
+                else {
+                    apu.ch1.period_low = LOBYTE(new_period);
+                    apu.ch1.period_high = HIBYTE(new_period);
+                    apu.ch1.frequency = 131072 / (2048 - new_period);
+                }
+
+                sweep_timer -= apu.ch1.sweep_pace / 128.f;
             }
         }
     }

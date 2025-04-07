@@ -314,6 +314,10 @@ extern apu_t apu;
 
 extern "C" {
 
+const char* opcode_to_string(uint8_t opcode) {
+    return opcode_strings[opcode].c_str();
+}
+
 static char bp_inter[5] = {0};
 static int32_t wram_page = 0;
 static int32_t rom_page = 0;
@@ -544,6 +548,10 @@ void cpp_imgui_render(void) {
             ImGui::Text("Envelope pace: %d", apu.ch1.envelope_pace);
             ImGui::Text("Envelope direction: %s",
                         apu.ch1.envelope_dir ? "INC" : "DEC");
+            ImGui::Text("Sweep step: %d", apu.ch1.sweep_step);
+            ImGui::Text("Sweep direction: %s",
+                        apu.ch1.sweep_direction ? "DEC" : "INC");
+            ImGui::Text("Sweep pace: %d", apu.ch1.sweep_pace);
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("2")) {
