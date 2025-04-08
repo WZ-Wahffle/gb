@@ -58,8 +58,8 @@ uint16_t read_16(uint16_t addr) {
 }
 
 void write_16(uint16_t addr, uint16_t val) {
-    write_8(addr, val & 0xf);
-    write_8(addr + 1, val >> 8);
+    write_8(addr, LOBYTE(val));
+    write_8(addr + 1, HIBYTE(val));
 }
 
 static uint8_t next_8(void) { return read_8(cpu.pc++); }
@@ -70,14 +70,14 @@ static uint16_t next_16(void) {
     return ret;
 }
 
-static void push_8(uint8_t val) { write_8(cpu.sp--, val); }
+static void push_8(uint8_t val) { write_8(--cpu.sp, val); }
 
 static void push_16(uint16_t val) {
     push_8(HIBYTE(val));
     push_8(LOBYTE(val));
 }
 
-static uint8_t pop_8(void) { return read_8(++cpu.sp); }
+static uint8_t pop_8(void) { return read_8(cpu.sp++); }
 
 static uint16_t pop_16(void) {
     uint8_t lsb = pop_8();

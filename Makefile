@@ -34,5 +34,5 @@ imgui: imgui/imgui.cpp
 
 
 build: imgui rlImGui raylib
-	g++ -c -o src/ui.o src/ui.cpp -Isrc/include/ -Wall -Wextra -Werror -Wno-unused-function -DSKIP_BOOT
+	g++ -c -o src/ui.o src/ui.cpp -Isrc/include/ -Wall -Wextra -Werror -Wno-unused-function
 	gcc -g -o out/gb src/*.c src/carts/*.c src/ui.o -Isrc/include/ -Lsrc/lib/ -lraylib -lSDL2 -lm -lrlImGui -limgui -Wall -Wextra -Werror -lstdc++ -Wno-unused-function -DSKIP_BOOT

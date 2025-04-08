@@ -43,6 +43,8 @@ int main(int argc, char **argv) {
         cpu.memory.free = nocart_free;
         break;
     case 1:
+    case 2:
+    case 3:
         mbc1_init(f, rom_size, ram_size);
         cpu.memory.read = mbc1_read;
         cpu.memory.write = mbc1_write;

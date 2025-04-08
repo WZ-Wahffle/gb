@@ -67,6 +67,10 @@ uint8_t mmu_read(uint16_t addr) {
             return 0xf | (ppu.select_dpad << 4) | (ppu.select_buttons << 5);
         case 0xff04:
             return cpu.div;
+            case 0xff0f:
+            return (cpu.memory.vblank_if << 0) | (cpu.memory.lcd_if << 1) |
+                   (cpu.memory.timer_if << 2) | (cpu.memory.serial_if << 3) |
+                   (cpu.memory.joypad_if << 4);
         case 0xff14:
             return (apu.ch1.enable << 7) | (apu.ch1.length_enable << 6) |
                    (apu.ch1.period_low);
@@ -148,6 +152,9 @@ void mmu_write(uint16_t addr, uint8_t value) {
             break;
         case 0xff02:
             // printf("TODO: Serial transfer control 0x%02x\n", value);
+            break;
+            case 0xff05:
+            cpu.memory.timer_counter = value;
             break;
         case 0xff06:
             cpu.memory.timer_modulo = value;

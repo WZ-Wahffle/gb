@@ -3,6 +3,7 @@
 static uint8_t *rom = NULL;
 static uint32_t rom_size_bytes = 0;
 static uint8_t rom_number = 0;
+static uint8_t secondary_rom_number = 0;
 static uint8_t *ram = NULL;
 static uint32_t ram_size_bytes = 0;
 static uint8_t ram_number = 0;
@@ -36,7 +37,15 @@ void mbc1_init(FILE *f, uint8_t rom_size, uint8_t ram_size) {
 
 uint8_t mbc1_read(uint16_t addr) {
     if (addr < 0x4000) {
-        return rom[addr];
+        if (banking_mode) {
+            uint32_t idx = addr + 0x4000 * (secondary_rom_number << 5);
+            ASSERT(idx < rom_size_bytes,
+                   "ROM access out of bounds, maximum size %d, adressed at %d",
+                   rom_size_bytes, idx);
+            return rom[idx];
+        } else {
+            return rom[addr];
+        }
     } else if (addr < 0x8000) {
         uint32_t idx = rom_number * 0x4000 + (addr % 0x4000);
         ASSERT(idx < rom_size_bytes,
@@ -45,12 +54,17 @@ uint8_t mbc1_read(uint16_t addr) {
         return rom[idx];
     } else if (addr >= 0xa000 && addr < 0xc000) {
         if (ram_enable) {
-            uint32_t idx = ram_number * 0x2000 + (addr % 0x2000);
-            ASSERT(idx < ram_size_bytes,
-                   "RAM access out of bounds, maximum size %d, adressed at %d",
-                   ram_size_bytes, idx);
+            if (banking_mode) {
+                uint32_t idx = ram_number * 0x2000 + (addr % 0x2000);
+                ASSERT(
+                    idx < ram_size_bytes,
+                    "RAM access out of bounds, maximum size %d, adressed at %d",
+                    ram_size_bytes, idx);
 
-            return ram[idx];
+                return ram[idx];
+            } else {
+                return ram[addr % 0x2000];
+            }
         } else
             return 0xff;
     }
@@ -60,26 +74,35 @@ uint8_t mbc1_read(uint16_t addr) {
 
 void mbc1_write(uint16_t addr, uint8_t value) {
     if (addr < 0x2000) {
-        ram_enable = value == 0xa;
+        ram_enable = (value & 0xf) == 0xa;
     } else if (addr < 0x4000) {
         rom_number = value & 0b11111;
         if (rom_number == 0)
             rom_number = 1;
         rom_number %= rom_size_bytes / 0x4000;
-        printf("Switched banks to %d\n", rom_number);
+        printf("Bank changed to %d\n", rom_number);
     } else if (addr < 0x6000) {
-        ram_number = value & 0b11;
+        if (ram_size_bytes == 0x8000) {
+            ram_number = value & 0b11;
+        } else if (rom_size_bytes >= 0x100000) {
+            secondary_rom_number = value & 0b11;
+        }
     } else if (addr < 0x8000) {
         banking_mode = value & 0b1;
-        ASSERT(0, "TODO: banking mode change to %d", banking_mode);
+        // ASSERT(0, "TODO: banking mode change to %d", banking_mode);
     } else if (addr >= 0xa000 && addr < 0xc000) {
         if (ram_enable) {
-            uint32_t idx = ram_number * 0x2000 + (addr % 0x2000);
-            ASSERT(idx < ram_size_bytes,
-                   "RAM access out of bounds, maximum size %d, adressed at %d",
-                   ram_size_bytes, idx);
+            if (banking_mode) {
+                uint32_t idx = ram_number * 0x2000 + (addr % 0x2000);
+                ASSERT(
+                    idx < ram_size_bytes,
+                    "RAM access out of bounds, maximum size %d, adressed at %d",
+                    ram_size_bytes, idx);
 
-            ram[idx] = value;
+                ram[idx] = value;
+            } else {
+                ram[addr % ram_size_bytes] = value;
+            }
         }
     }
 }
