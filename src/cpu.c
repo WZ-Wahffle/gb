@@ -737,8 +737,8 @@ uint8_t execute(void) {
                 set_status_bit(Z_STATUS, false);
                 set_status_bit(N_STATUS, false);
                 set_status_bit(H_STATUS,
-                               (cpu.sp & 0xfff) + (operand & 0xfff) > 0xfff);
-                set_status_bit(C_STATUS, cpu.sp + operand > 0xffff);
+                               (cpu.sp & 0xf) + (operand & 0xf) > 0xf);
+                set_status_bit(C_STATUS, (cpu.sp & 0xff) + (operand & 0xff) > 0xff);
                 cpu.sp = result;
             } else if (opcode == 0b11111000) {
                 int16_t operand = (int8_t)next_8();
@@ -746,8 +746,8 @@ uint8_t execute(void) {
                 set_status_bit(Z_STATUS, false);
                 set_status_bit(N_STATUS, false);
                 set_status_bit(H_STATUS,
-                               (cpu.sp & 0xfff) + (operand & 0xfff) > 0xfff);
-                set_status_bit(C_STATUS, cpu.sp + operand > 0xffff);
+                               (cpu.sp & 0xf) + (operand & 0xf) > 0xf);
+                set_status_bit(C_STATUS, (cpu.sp & 0xff) + (operand & 0xff) > 0xff);
                 r16_write(HL, result);
             } else if (opcode == 0b11111001) {
                 // ld sp, hl

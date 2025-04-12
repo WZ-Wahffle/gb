@@ -8,25 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define DYNARRAY(type)                                                         \
-    typedef struct {                                                           \
-        type *items;                                                           \
-        size_t count;                                                          \
-        size_t capacity;                                                       \
-    } dyn_##type;                                                              \
-    inline void dyn_##type##_append(dyn_##type arr, type elem) {               \
-        if (arr.count >= arr.capacity) {                                       \
-            if (arr.capacity == 0)                                             \
-                arr.capacity = 8;                                              \
-            else                                                               \
-                arr.capacity *= 2;                                             \
-            arr.items =                                                        \
-                (type *)realloc(arr.items, arr.capacity * sizeof(*arr.items)); \
-        }                                                                      \
-        arr.items[arr.count++] = elem;                                         \
-    }
-
-DYNARRAY(uint32_t)
 // custom assertion macro to allow registering exit callback
 #define ASSERT(val, msg, ...)                                                  \
     do {                                                                       \
@@ -99,6 +80,8 @@ typedef struct {
 } cpu_mmu_t;
 
 typedef struct {
+    char* filename;
+
     cpu_mmu_t memory;
     uint8_t a, b, c, d, e, f, h, l;
     uint16_t sp, pc;
@@ -122,13 +105,19 @@ typedef struct {
     bool watching_opcode;
     bool watch_opcode_interrupt;
 
+    void(*cycles_callback)(uint32_t count);
+    void(*save_callback)(FILE*);
+    void(*load_callback)(FILE*);
 } cpu_t;
 
 typedef struct {
     uint8_t mode;
     uint32_t bg_color[4];
+    uint8_t bg_color_reg;
     uint32_t obj_color_1[4];
+    uint8_t obj_color_1_reg;
     uint32_t obj_color_2[4];
+    uint8_t obj_color_2_reg;
     double remaining_cycles;
     uint8_t scroll_x, scroll_y;
     bool ppu_enable;
@@ -233,6 +222,7 @@ typedef struct {
     pulse_channel_t ch2;
     wave_channel_t ch3;
     noise_channel_t ch4;
+    bool muted;
 } apu_t;
 
 #endif

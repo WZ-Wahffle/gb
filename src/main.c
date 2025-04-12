@@ -1,9 +1,11 @@
 #include "apu.h"
 #include "carts/mbc1.h"
+#include "carts/mbc3.h"
 #include "carts/nocart.h"
 #include "ppu.h"
-#include <threads.h>
 #include "ui.h"
+#include <string.h>
+#include <threads.h>
 
 extern cpu_t cpu;
 extern ppu_t ppu;
@@ -15,7 +17,8 @@ void exit_cb(int code, void *param) {
 
     printf("Trace:\n");
     for (uint16_t idx = cpu.prev_idx + 1; idx != cpu.prev_idx; idx++) {
-        printf("0x%04x: %s\n", cpu.prev_pc[idx], opcode_to_string(cpu.prev_opcode[idx]));
+        printf("0x%04x: %s\n", cpu.prev_pc[idx],
+               opcode_to_string(cpu.prev_opcode[idx]));
     }
 }
 
@@ -25,6 +28,8 @@ int main(int argc, char **argv) {
         "Incorrect number of parameters, found %d. Usage: \n./gb <game>.gb\n",
         argc);
     FILE *f = fopen(argv[1], "rb");
+    *strrchr(argv[1], '.') = 0;
+    cpu.filename = argv[1];
     ASSERT(f != NULL, "Could not open %s!\n", argv[1]);
     fseek(f, 0x147, SEEK_SET);
     uint8_t cart_type, rom_size, ram_size;
@@ -36,19 +41,32 @@ int main(int argc, char **argv) {
     printf("ROM Size %d Bytes\n", 32768 * (1 << rom_size));
 
     switch (cart_type) {
-    case 0:
+    case 0x00:
         nocart_init(f, rom_size, ram_size);
         cpu.memory.read = nocart_read;
         cpu.memory.write = nocart_write;
         cpu.memory.free = nocart_free;
         break;
-    case 1:
-    case 2:
-    case 3:
+    case 0x01:
+    case 0x02:
+    case 0x03:
         mbc1_init(f, rom_size, ram_size);
         cpu.memory.read = mbc1_read;
         cpu.memory.write = mbc1_write;
         cpu.memory.free = mbc1_free;
+        break;
+    case 0x0f:
+    case 0x10:
+    case 0x11:
+    case 0x12:
+    case 0x13:
+        mbc3_init(f, rom_size, ram_size);
+        cpu.memory.read = mbc3_read;
+        cpu.memory.write = mbc3_write;
+        cpu.memory.free = mbc3_free;
+        cpu.cycles_callback = mbc3_cycle_callback;
+        cpu.save_callback = mbc3_save;
+        cpu.load_callback = mbc3_load;
         break;
     default:
         ASSERT(0, "Unsupported cart type 0x%02x\n", cart_type);

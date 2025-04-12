@@ -6,6 +6,7 @@
 
 extern cpu_t cpu;
 extern ppu_t ppu;
+extern apu_t apu;
 
 static uint32_t colors[] = {0xffffffff, 0xffc8c8c8, 0xff828282, 0xff000000};
 
@@ -14,6 +15,7 @@ void set_bg_palette(uint8_t value) {
     ppu.bg_color[1] = colors[(value >> 2) & 0b11];
     ppu.bg_color[2] = colors[(value >> 4) & 0b11];
     ppu.bg_color[3] = colors[(value >> 6) & 0b11];
+    ppu.bg_color_reg = value;
 }
 
 void set_obj_palette_1(uint8_t value) {
@@ -21,6 +23,7 @@ void set_obj_palette_1(uint8_t value) {
     ppu.obj_color_1[1] = colors[(value >> 2) & 0b11];
     ppu.obj_color_1[2] = colors[(value >> 4) & 0b11];
     ppu.obj_color_1[3] = colors[(value >> 6) & 0b11];
+    ppu.obj_color_1_reg = value;
 }
 
 void set_obj_palette_2(uint8_t value) {
@@ -28,6 +31,7 @@ void set_obj_palette_2(uint8_t value) {
     ppu.obj_color_2[1] = colors[(value >> 2) & 0b11];
     ppu.obj_color_2[2] = colors[(value >> 4) & 0b11];
     ppu.obj_color_2[3] = colors[(value >> 6) & 0b11];
+    ppu.obj_color_2_reg = value;
 }
 
 void lcd_control(uint8_t value) {
@@ -51,6 +55,7 @@ void lcd_status_write(uint8_t value) {
 static void try_step_cpu(void) {
     if (cpu.remaining_cycles > 0) {
         uint8_t elapsed_cycles = execute();
+        if(cpu.cycles_callback) cpu.cycles_callback(elapsed_cycles);
         check_interrupts();
         if (cpu.pc == cpu.breakpoint) {
             cpu.state = STOPPED;
@@ -251,12 +256,12 @@ static void try_step_ppu(void) {
                 cpu.memory.lcd_if = true;
         }
 
-        if (ppu.drawing_y > 143) {
+        if (ppu.drawing_y == 144 && ppu.drawing_x == 0) {
             ppu.mode = 1;
             cpu.memory.vblank_if = true;
             if (ppu.mode_1_int)
                 cpu.memory.lcd_if = true;
-        } else {
+        } else if(ppu.drawing_y < 144) {
             if (ppu.drawing_x < 80) {
                 ppu.mode = 2;
                 if (ppu.mode_2_int)
@@ -349,6 +354,10 @@ void ui(void) {
 
         if (IsKeyPressed(KEY_LEFT_ALT)) {
             show_electron_beam = !show_electron_beam;
+        }
+
+        if(IsKeyPressed(KEY_M)) {
+            apu.muted = !apu.muted;
         }
 
         if (show_debug) {

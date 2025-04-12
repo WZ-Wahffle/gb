@@ -29,7 +29,7 @@ static void ch1_cb(void *buffer, uint32_t sample_count) {
            "Pulse channel 1 duty cycle out of bounds, found %d",
            apu.ch1.wave_duty);
     for (uint32_t i = 0; i < sample_count; i++) {
-        out[i] = (int16_t)(32000.f * 0.02 *
+        out[i] = !apu.muted * (int16_t)(32000.f * 0.02 *
                            square_wave(2 * PI * square_idx, apu.ch1.wave_duty) *
                            (apu.audio_enable ? 1 : 0) *
                            (apu.ch1.enable ? 1 : 0) * (apu.ch1.volume / 15.f));
@@ -99,7 +99,7 @@ static void ch2_cb(void *buffer, uint32_t sample_count) {
            "Pulse channel 2 duty cycle out of bounds, found %d",
            apu.ch2.wave_duty);
     for (uint32_t i = 0; i < sample_count; i++) {
-        out[i] = (int16_t)(32000.f * 0.02 *
+        out[i] = !apu.muted * (int16_t)(32000.f * 0.02 *
                            square_wave(2 * PI * square_idx, apu.ch2.wave_duty) *
                            (apu.audio_enable ? 1 : 0) *
                            (apu.ch2.enable ? 1 : 0) * (apu.ch2.volume / 15.f));
@@ -144,7 +144,7 @@ static void ch3_cb(void *buffer, uint32_t sample_count) {
 
     for (uint32_t i = 0; i < sample_count; i++) {
         out[i] =
-            (int16_t)(32000.f * 0.02 *
+            !apu.muted * (int16_t)(32000.f * 0.02 *
                       ((((uint8_t)table_idx % 2)
                             ? (apu.ch3.wave_ram[(uint8_t)table_idx / 2] & 0xf)
                             : (apu.ch3.wave_ram[(uint8_t)table_idx / 2] >> 4)) /
@@ -180,7 +180,7 @@ static void ch4_cb(void *buffer, uint32_t sample_count) {
 
     for (uint32_t i = 0; i < sample_count; i++) {
         out[i] =
-            (int16_t)(32000.f * 0.02 * (apu.ch4.lfsr & 1) * (apu.audio_enable) *
+            !apu.muted * (int16_t)(32000.f * 0.02 * (apu.ch4.lfsr & 1) * (apu.audio_enable) *
                       (apu.ch4.enable ? 1 : 0) * (apu.ch4.volume / 15.f));
 
         if (apu.ch4.envelope_pace != 0) {

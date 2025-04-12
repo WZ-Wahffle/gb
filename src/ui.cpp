@@ -1,10 +1,11 @@
 #include <cmath>
+#include <cstdio>
+#include <string>
 #define NO_FONT_AWESOME
 #include "cpu.h"
 #include "imgui.h"
 #include "rlImGui.h"
 #include "types.h"
-#include <string>
 
 std::string opcode_strings[] = {"NOP",
                                 "LD BC,0x%04x",
@@ -314,7 +315,7 @@ extern apu_t apu;
 
 extern "C" {
 
-const char* opcode_to_string(uint8_t opcode) {
+const char *opcode_to_string(uint8_t opcode) {
     return opcode_strings[opcode].c_str();
 }
 
@@ -324,12 +325,51 @@ static int32_t rom_page = 0;
 static uint16_t poke_location = 0;
 static uint8_t poke_value = 0;
 
+static bool confirm_save = false, confirm_load = false;
+
 void cpp_init(void) { rlImGuiSetup(true); }
 
 void cpp_imgui_render(void) {
     rlImGuiBegin();
     ImGui::Begin("debug", NULL, ImGuiWindowFlags_NoCollapse);
     ImGui::SetWindowFontScale(2);
+
+    if (ImGui::Button(confirm_save ? "Confirm Save##Save" : "Save##Save")) {
+        if (cpu.save_callback) {
+            if (!confirm_save)
+                confirm_save = true;
+            else {
+                FILE *f =
+                    fopen((std::string(cpu.filename) + ".wsav").c_str(), "w");
+                cpu.save_callback(f);
+                fclose(f);
+                confirm_save = false;
+            }
+        }
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button(confirm_load ? "Confirm Load##Load" : "Load##Load")) {
+        if (cpu.load_callback) {
+            if (!confirm_load)
+                confirm_load = true;
+            else {
+                FILE *f =
+                    fopen((std::string(cpu.filename) + ".wsav").c_str(), "rb");
+                cpu.load_callback(f);
+                fclose(f);
+                confirm_load = false;
+            }
+        }
+    }
+
+    ImGui::SameLine();
+
+    if(ImGui::Button("Reset Confirms")) {
+        confirm_save = false;
+        confirm_load = false;
+    }
 
     if (read_8(cpu.pc) == 0xcb) {
         uint8_t opcode = read_8(cpu.pc + 1);

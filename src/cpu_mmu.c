@@ -67,13 +67,17 @@ uint8_t mmu_read(uint16_t addr) {
             return 0xf | (ppu.select_dpad << 4) | (ppu.select_buttons << 5);
         case 0xff04:
             return cpu.div;
-            case 0xff0f:
+        case 0xff0f:
             return (cpu.memory.vblank_if << 0) | (cpu.memory.lcd_if << 1) |
                    (cpu.memory.timer_if << 2) | (cpu.memory.serial_if << 3) |
                    (cpu.memory.joypad_if << 4);
+        case 0xff11:
+            return apu.ch1.initial_length_timer | (apu.ch1.wave_duty << 6);
         case 0xff14:
             return (apu.ch1.enable << 7) | (apu.ch1.length_enable << 6) |
                    (apu.ch1.period_low);
+        case 0xff16:
+            return apu.ch2.initial_length_timer | (apu.ch2.wave_duty << 6);
         case 0xff19:
             return (apu.ch2.enable << 7) | (apu.ch2.length_enable << 6) |
                    (apu.ch2.period_low);
@@ -81,7 +85,15 @@ uint8_t mmu_read(uint16_t addr) {
             return (apu.ch3.enable << 7) | (apu.ch3.length_enable << 6) |
                    (apu.ch3.period_low);
         case 0xff23:
-            return (apu.ch3.enable << 7) | (apu.ch3.length_enable << 6);
+            return (apu.ch4.enable << 7) | (apu.ch4.length_enable << 6);
+        case 0xff24:
+            return (apu.vin_left << 7) | (apu.vol_left << 4) |
+                   (apu.vin_right << 3) | (apu.vol_right << 0);
+        case 0xff25:
+            return (apu.ch4.pan_left << 7) | (apu.ch3.pan_left << 6) |
+                   (apu.ch2.pan_left << 5) | (apu.ch1.pan_left << 4) |
+                   (apu.ch4.pan_right << 3) | (apu.ch3.pan_right << 2) |
+                   (apu.ch2.pan_right << 1) | (apu.ch1.pan_right << 0);
         case 0xff4d:
         case 0xff4f:
         case 0xff68:
@@ -104,6 +116,12 @@ uint8_t mmu_read(uint16_t addr) {
             return ppu.scroll_y;
         case 0xff44:
             return ppu.ly;
+        case 0xff47:
+            return ppu.bg_color_reg;
+        case 0xff48:
+            return ppu.obj_color_1_reg;
+        case 0xff49:
+            return ppu.obj_color_2_reg;
         case 0xff4a:
             return ppu.wy;
         case 0xff4b:
@@ -153,7 +171,7 @@ void mmu_write(uint16_t addr, uint8_t value) {
         case 0xff02:
             // printf("TODO: Serial transfer control 0x%02x\n", value);
             break;
-            case 0xff05:
+        case 0xff05:
             cpu.memory.timer_counter = value;
             break;
         case 0xff06:
