@@ -36,7 +36,6 @@
 #define CYCLES_PER_DOT (CPU_FREQ / DOT_FREQ)
 #define SCANLINE_COUNT 154
 #define SAMPLE_RATE 48000
-#define PLAYBACK_SPEED 1.0
 
 typedef enum { B, C, D, E, H, L, INDHL, A } r8_t;
 
@@ -92,6 +91,7 @@ typedef struct {
     bool ime;
     uint8_t div;
     bool halted;
+    double playback_speed;
 
     uint16_t prev_pc[0x10000];
     uint16_t prev_idx;

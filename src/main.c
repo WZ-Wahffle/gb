@@ -87,6 +87,7 @@ int main(int argc, char **argv) {
     cpu.memory.finished_boot = true;
 #endif
 
+    cpu.playback_speed = 1;
     thrd_t apu_thread;
     thrd_create(&apu_thread, apu_init, NULL);
     thrd_detach(apu_thread);

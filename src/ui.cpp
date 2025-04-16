@@ -366,9 +366,15 @@ void cpp_imgui_render(void) {
 
     ImGui::SameLine();
 
-    if(ImGui::Button("Reset Confirms")) {
+    if (ImGui::Button("Reset Confirms")) {
         confirm_save = false;
         confirm_load = false;
+    }
+
+    ImGui::Text("Current Speed: %.4lfx", cpu.playback_speed);
+    ImGui::SameLine();
+    if (ImGui::Button("Reset Speed")) {
+        cpu.playback_speed = 1;
     }
 
     if (read_8(cpu.pc) == 0xcb) {

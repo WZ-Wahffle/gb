@@ -1,5 +1,7 @@
 #include "mbc1.h"
 
+extern cpu_t cpu;
+
 static uint8_t *rom = NULL;
 static uint32_t rom_size_bytes = 0;
 static uint8_t rom_number = 0;
@@ -79,7 +81,9 @@ void mbc1_write(uint16_t addr, uint8_t value) {
         if (rom_number == 0)
             rom_number = 1;
         rom_number %= rom_size_bytes / 0x4000;
-        printf("Bank changed to %d\n", rom_number);
+        cpu.prev_opcode[cpu.prev_idx] = 0xd3;
+        cpu.prev_pc[cpu.prev_idx] = rom_number;
+        cpu.prev_idx++;
     } else if (addr < 0x6000) {
         secondary_number = value & 0b11;
     } else if (addr < 0x8000) {

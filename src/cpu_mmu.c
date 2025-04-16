@@ -67,6 +67,8 @@ uint8_t mmu_read(uint16_t addr) {
             return 0xf | (ppu.select_dpad << 4) | (ppu.select_buttons << 5);
         case 0xff04:
             return cpu.div;
+        case 0xff05:
+            return cpu.memory.timer_counter;
         case 0xff0f:
             return (cpu.memory.vblank_if << 0) | (cpu.memory.lcd_if << 1) |
                    (cpu.memory.timer_if << 2) | (cpu.memory.serial_if << 3) |

@@ -55,7 +55,8 @@ void lcd_status_write(uint8_t value) {
 static void try_step_cpu(void) {
     if (cpu.remaining_cycles > 0) {
         uint8_t elapsed_cycles = execute();
-        if(cpu.cycles_callback) cpu.cycles_callback(elapsed_cycles);
+        if (cpu.cycles_callback)
+            cpu.cycles_callback(elapsed_cycles);
         check_interrupts();
         if (cpu.pc == cpu.breakpoint) {
             cpu.state = STOPPED;
@@ -183,6 +184,8 @@ static void try_step_ppu(void) {
             }
         }
 
+        if(!ppu.ppu_enable) return;
+
         if (ppu.drawing_x >= 80 && ppu.drawing_x < 240) {
             if (ppu.drawing_y < 144) {
                 uint8_t screen_x = ppu.drawing_x - 80;
@@ -220,7 +223,8 @@ static void try_step_ppu(void) {
                                 if (col_idx != 0 &&
                                     !((cpu.memory.oam[i].attr & 0x80) != 0 &&
                                       get_pixel(screen_x, screen_y) !=
-                                          ppu.bg_color[0]))set_pixel(screen_x, screen_y, col_idx);
+                                          ppu.bg_color[0]))
+                                    set_pixel(screen_x, screen_y, col_idx);
                             }
                         } else {
                             if (IN_INTERVAL(cpu.memory.oam[i].y - 9, screen_y,
@@ -252,7 +256,7 @@ static void try_step_ppu(void) {
             }
 
             ppu.ly = ppu.drawing_y;
-            if (ppu.lyc_int && ppu.ly == ppu.lyc)
+            if (ppu.lyc_int && ppu.ly == ppu.lyc && ppu.drawing_x == 0)
                 cpu.memory.lcd_if = true;
         }
 
@@ -261,14 +265,14 @@ static void try_step_ppu(void) {
             cpu.memory.vblank_if = true;
             if (ppu.mode_1_int)
                 cpu.memory.lcd_if = true;
-        } else if(ppu.drawing_y < 144) {
-            if (ppu.drawing_x < 80) {
+        } else if (ppu.drawing_y < 144) {
+            if (ppu.drawing_x == 0) {
                 ppu.mode = 2;
                 if (ppu.mode_2_int)
                     cpu.memory.lcd_if = true;
-            } else if (ppu.drawing_x < 252) {
+            } else if (ppu.drawing_x == 80) {
                 ppu.mode = 3;
-            } else {
+            } else if (ppu.drawing_x == 252) {
                 ppu.mode = 0;
                 if (ppu.mode_0_int)
                     cpu.memory.lcd_if = true;
@@ -294,16 +298,24 @@ void ui(void) {
         BeginDrawing();
         ClearBackground(BLACK);
 
-        ppu.a = IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) || IsKeyDown(KEY_A);
-        ppu.b = IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) || IsKeyDown(KEY_B);
-        ppu.start = IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) || IsKeyDown(KEY_RIGHT_SHIFT);
-        ppu.select = IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_LEFT) || IsKeyDown(KEY_LEFT_SHIFT);
-        ppu.up = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) < -0.5 || IsKeyDown(KEY_UP);
-        ppu.down = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) > 0.5 || IsKeyDown(KEY_DOWN);
-        ppu.left = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) < -0.5 || IsKeyDown(KEY_LEFT);
-        ppu.right = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) > 0.5 || IsKeyDown(KEY_RIGHT);
+        ppu.a = IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) ||
+                IsKeyDown(KEY_A);
+        ppu.b = IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
+                IsKeyDown(KEY_B);
+        ppu.start = IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) ||
+                    IsKeyDown(KEY_RIGHT_SHIFT);
+        ppu.select = IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_LEFT) ||
+                     IsKeyDown(KEY_LEFT_SHIFT);
+        ppu.up = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) < -0.5 ||
+                 IsKeyDown(KEY_UP);
+        ppu.down = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) > 0.5 ||
+                   IsKeyDown(KEY_DOWN);
+        ppu.left = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) < -0.5 ||
+                   IsKeyDown(KEY_LEFT);
+        ppu.right = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) > 0.5 ||
+                    IsKeyDown(KEY_RIGHT);
 
-        for (uint32_t i = 0; i < 70224 * PLAYBACK_SPEED; i++) {
+        for (uint32_t i = 0; i < 70224 * cpu.playback_speed; i++) {
             switch (cpu.state) {
             case STOPPED:
                 // this page intentionally left blank
@@ -356,8 +368,16 @@ void ui(void) {
             show_electron_beam = !show_electron_beam;
         }
 
-        if(IsKeyPressed(KEY_M)) {
+        if (IsKeyPressed(KEY_M)) {
             apu.muted = !apu.muted;
+        }
+
+        if (IsKeyPressed(KEY_END)) {
+            cpu.playback_speed *= 2;
+        }
+
+        if (IsKeyPressed(KEY_HOME)) {
+            cpu.playback_speed /= 2;
         }
 
         if (show_debug) {
