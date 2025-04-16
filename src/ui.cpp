@@ -598,6 +598,9 @@ void cpp_imgui_render(void) {
             ImGui::Text("Sweep direction: %s",
                         apu.ch1.sweep_direction ? "DEC" : "INC");
             ImGui::Text("Sweep pace: %d", apu.ch1.sweep_pace);
+            ImGui::Text("Length timer enabled: %s", apu.ch1.length_enable ? "true" : "false");
+            ImGui::Text("Length timer initial: %d", apu.ch1.initial_length_timer);
+            ImGui::Text("Length timer current: %d", apu.ch1.current_length_timer);
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("2")) {
@@ -611,6 +614,9 @@ void cpp_imgui_render(void) {
             ImGui::Text("Envelope pace: %d", apu.ch2.envelope_pace);
             ImGui::Text("Envelope direction: %s",
                         apu.ch2.envelope_dir ? "INC" : "DEC");
+            ImGui::Text("Length timer enabled: %s", apu.ch2.length_enable ? "true" : "false");
+            ImGui::Text("Length timer initial: %d", apu.ch2.initial_length_timer);
+            ImGui::Text("Length timer current: %d", apu.ch2.current_length_timer);
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("3")) {
@@ -620,6 +626,9 @@ void cpp_imgui_render(void) {
             ImGui::Text("Period high: %d", apu.ch3.period_high);
             ImGui::Text("Frequency: %d Hz", apu.ch3.frequency);
             ImGui::Text("Volume: %0.4f", apu.ch3.volume / 4.f);
+            ImGui::Text("Length timer enabled: %s", apu.ch3.length_enable ? "true" : "false");
+            ImGui::Text("Length timer initial: %d", apu.ch3.initial_length_timer);
+            ImGui::Text("Length timer current: %d", apu.ch3.current_length_timer);
             float wave_table_adj[32] = {0};
             for (uint8_t i = 0; i < 16; i++) {
                 wave_table_adj[i * 2] = (apu.ch3.wave_ram[i] >> 4) / 15.f;
@@ -638,6 +647,9 @@ void cpp_imgui_render(void) {
             ImGui::Text("Using %s LFSR",
                         apu.ch4.narrow_lfsr ? "narrow" : "wide");
             ImGui::Text("LFSR: %016b", apu.ch4.lfsr);
+            ImGui::Text("Length timer enabled: %s", apu.ch4.length_enable ? "true" : "false");
+            ImGui::Text("Length timer initial: %d", apu.ch4.initial_length_timer);
+            ImGui::Text("Length timer current: %d", apu.ch4.current_length_timer);
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();

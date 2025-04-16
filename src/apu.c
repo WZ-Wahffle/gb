@@ -29,7 +29,8 @@ static void ch1_cb(void *buffer, uint32_t sample_count) {
            "Pulse channel 1 duty cycle out of bounds, found %d",
            apu.ch1.wave_duty);
     for (uint32_t i = 0; i < sample_count; i++) {
-        out[i] = !apu.muted * (int16_t)(32000.f * 0.02 *
+        out[i] = !apu.muted *
+                 (int16_t)(32000.f * 0.02 *
                            square_wave(2 * PI * square_idx, apu.ch1.wave_duty) *
                            (apu.audio_enable ? 1 : 0) *
                            (apu.ch1.enable ? 1 : 0) * (apu.ch1.volume / 15.f));
@@ -99,7 +100,8 @@ static void ch2_cb(void *buffer, uint32_t sample_count) {
            "Pulse channel 2 duty cycle out of bounds, found %d",
            apu.ch2.wave_duty);
     for (uint32_t i = 0; i < sample_count; i++) {
-        out[i] = !apu.muted * (int16_t)(32000.f * 0.02 *
+        out[i] = !apu.muted *
+                 (int16_t)(32000.f * 0.02 *
                            square_wave(2 * PI * square_idx, apu.ch2.wave_duty) *
                            (apu.audio_enable ? 1 : 0) *
                            (apu.ch2.enable ? 1 : 0) * (apu.ch2.volume / 15.f));
@@ -144,7 +146,8 @@ static void ch3_cb(void *buffer, uint32_t sample_count) {
 
     for (uint32_t i = 0; i < sample_count; i++) {
         out[i] =
-            !apu.muted * (int16_t)(32000.f * 0.02 *
+            !apu.muted *
+            (int16_t)(32000.f * 0.02 *
                       ((((uint8_t)table_idx % 2)
                             ? (apu.ch3.wave_ram[(uint8_t)table_idx / 2] & 0xf)
                             : (apu.ch3.wave_ram[(uint8_t)table_idx / 2] >> 4)) /
@@ -180,7 +183,8 @@ static void ch4_cb(void *buffer, uint32_t sample_count) {
 
     for (uint32_t i = 0; i < sample_count; i++) {
         out[i] =
-            !apu.muted * (int16_t)(32000.f * 0.02 * (apu.ch4.lfsr & 1) * (apu.audio_enable) *
+            !apu.muted *
+            (int16_t)(32000.f * 0.02 * (apu.ch4.lfsr & 1) * (apu.audio_enable) *
                       (apu.ch4.enable ? 1 : 0) * (apu.ch4.volume / 15.f));
 
         if (apu.ch4.envelope_pace != 0) {
@@ -299,17 +303,21 @@ void ch1_volume_envelope(uint8_t val) {
     apu.ch1.envelope_initial_volume = val >> 4;
 }
 
-void ch1_period_low(uint8_t val) { apu.ch1.period_low = val; }
+void ch1_period_low(uint8_t val) {
+    apu.ch1.period_low = val;
+    apu.ch1.frequency =
+        131072 / (2048 - TO_U16(apu.ch1.period_low, apu.ch1.period_high));
+}
 
 void ch1_period_high_control(uint8_t val) {
     apu.ch1.period_high = val & 0b111;
     apu.ch1.length_enable = val & 0x40;
+    apu.ch1.frequency =
+        131072 / (2048 - TO_U16(apu.ch1.period_low, apu.ch1.period_high));
     if (val & 0x80) {
         apu.ch1.enable = true;
         if (apu.ch1.current_length_timer >= 64)
             apu.ch1.current_length_timer = apu.ch1.initial_length_timer;
-        apu.ch1.frequency =
-            131072 / (2048 - TO_U16(apu.ch1.period_low, apu.ch1.period_high));
         // TODO: reset envelope timer
         apu.ch1.volume = apu.ch1.envelope_initial_volume;
     }
@@ -326,38 +334,41 @@ void ch2_volume_envelope(uint8_t val) {
     apu.ch2.envelope_initial_volume = val >> 4;
 }
 
-void ch2_period_low(uint8_t val) { apu.ch2.period_low = val; }
+void ch2_period_low(uint8_t val) {
+    apu.ch2.period_low = val;
+    apu.ch2.frequency =
+        131072 / (2048 - TO_U16(apu.ch2.period_low, apu.ch2.period_high));
+}
 
 void ch2_period_high_control(uint8_t val) {
     apu.ch2.period_high = val & 0b111;
     apu.ch2.length_enable = val & 0x40;
+    apu.ch2.frequency =
+        131072 / (2048 - TO_U16(apu.ch2.period_low, apu.ch2.period_high));
     if (val & 0x80) {
         apu.ch2.enable = true;
         if (apu.ch2.current_length_timer >= 64)
             apu.ch2.current_length_timer = apu.ch2.initial_length_timer;
-        apu.ch2.frequency =
-            131072 / (2048 - TO_U16(apu.ch2.period_low, apu.ch2.period_high));
         // TODO: reset envelope timer
         apu.ch2.volume = apu.ch2.envelope_initial_volume;
     }
 }
 
-void ch3_period_low(uint8_t val) { apu.ch3.period_low = val; }
+void ch3_period_low(uint8_t val) {
+    apu.ch3.period_low = val;
+    apu.ch3.frequency =
+        65536 / (2048 - TO_U16(apu.ch3.period_low, apu.ch3.period_high));
+}
 
 void ch3_period_high_control(uint8_t val) {
     apu.ch3.period_high = val & 0b111;
     apu.ch3.length_enable = val & 0x40;
+    apu.ch3.frequency =
+        65536 / (2048 - TO_U16(apu.ch3.period_low, apu.ch3.period_high));
     if (val & 0x80) {
         apu.ch3.enable = true;
         if (apu.ch3.current_length_timer >= 256)
             apu.ch3.current_length_timer = apu.ch3.initial_length_timer;
-        apu.ch3.frequency =
-            65536 / (2048 - TO_U16(apu.ch3.period_low, apu.ch3.period_high));
-
-        if (apu.ch3.output_level == 0)
-            apu.ch3.volume = 0;
-        else
-            apu.ch3.volume = 4 >> (apu.ch3.output_level - 1);
     }
 }
 

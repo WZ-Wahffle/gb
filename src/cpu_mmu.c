@@ -44,7 +44,8 @@ uint8_t mmu_read(uint16_t addr) {
     } else if (addr < 0xe000) {
         return cpu.memory.wram[addr % 0x2000];
     } else if (addr < 0xfe00) {
-        ASSERT(0, "Read from 0x%04x, Nintendo says no\n", addr);
+        return cpu.memory.wram[addr % 0x2000];
+        // ASSERT(0, "Read from 0x%04x, Nintendo says no\n", addr);
     } else if (addr < 0xfea0) {
         return ((uint8_t *)cpu.memory.oam)[addr - 0xfe00];
     } else if (addr < 0xff00) {
@@ -154,7 +155,8 @@ void mmu_write(uint16_t addr, uint8_t value) {
     } else if (addr < 0xe000) {
         cpu.memory.wram[addr % 0x2000] = value;
     } else if (addr < 0xfe00) {
-        ASSERT(0, "Write of 0x%02x to 0x%04x, Nintendo says no\n", value, addr);
+        cpu.memory.wram[addr % 0x2000] = value;
+        // ASSERT(0, "Write of 0x%02x to 0x%04x, Nintendo says no\n", value, addr);
     } else if (addr < 0xfea0) {
         ((uint8_t *)cpu.memory.oam)[addr - 0xfe00] = value;
     } else if (addr < 0xff00) {
@@ -225,6 +227,10 @@ void mmu_write(uint16_t addr, uint8_t value) {
             break;
         case 0xff1c:
             apu.ch3.output_level = (value >> 5) & 0b11;
+            if (apu.ch3.output_level == 0)
+                apu.ch3.volume = 0;
+            else
+                apu.ch3.volume = 4 >> (apu.ch3.output_level - 1);
             break;
         case 0xff1d:
             ch3_period_low(value);
