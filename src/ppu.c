@@ -197,7 +197,7 @@ static void try_step_ppu(void) {
                     }
                 }
                 if (ppu.enable_objects) {
-                    for (uint8_t i = 0; i < 40; i++) {
+                    for (int32_t i = 39; i >= 0; i--) {
                         if (ppu.large_objects) {
                             if (IN_INTERVAL(cpu.memory.oam[i].y - 1, screen_y,
                                             screen_y + 16) &&

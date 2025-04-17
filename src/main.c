@@ -54,6 +54,8 @@ int main(int argc, char **argv) {
         cpu.memory.read = mbc1_read;
         cpu.memory.write = mbc1_write;
         cpu.memory.free = mbc1_free;
+        cpu.save_callback = mbc1_save;
+        cpu.load_callback = mbc1_load;
         break;
     case 0x0f:
     case 0x10:
@@ -88,6 +90,7 @@ int main(int argc, char **argv) {
 #endif
 
     cpu.playback_speed = 1;
+    ppu.ppu_enable = true;
     thrd_t apu_thread;
     thrd_create(&apu_thread, apu_init, NULL);
     thrd_detach(apu_thread);

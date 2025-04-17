@@ -111,3 +111,15 @@ void mbc1_free(void) {
     if (ram)
         free(ram);
 }
+
+void mbc1_save(FILE* f) {
+    fwrite(&ram_size_bytes, 4, 1, f);
+    fwrite(ram, 1, ram_size_bytes, f);
+}
+
+void mbc1_load(FILE* f) {
+    uint32_t ram_size_bytes_tmp;
+    fread(&ram_size_bytes_tmp, 4, 1, f);
+    ASSERT(ram_size_bytes == ram_size_bytes_tmp, "Loaded save file does not match cartridge, expected RAM size %d, got %d", ram_size_bytes, ram_size_bytes_tmp);
+    fread(ram, 1, ram_size_bytes, f);
+}

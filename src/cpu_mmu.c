@@ -84,6 +84,8 @@ uint8_t mmu_read(uint16_t addr) {
         case 0xff19:
             return (apu.ch2.enable << 7) | (apu.ch2.length_enable << 6) |
                    (apu.ch2.period_low);
+        case 0xff1a:
+            return apu.ch3.dac_on << 7;
         case 0xff1e:
             return (apu.ch3.enable << 7) | (apu.ch3.length_enable << 6) |
                    (apu.ch3.period_low);
@@ -97,6 +99,10 @@ uint8_t mmu_read(uint16_t addr) {
                    (apu.ch2.pan_left << 5) | (apu.ch1.pan_left << 4) |
                    (apu.ch4.pan_right << 3) | (apu.ch3.pan_right << 2) |
                    (apu.ch2.pan_right << 1) | (apu.ch1.pan_right << 0);
+        case 0xff26:
+            return (apu.audio_enable << 7) | (apu.ch4.enable << 3) |
+                   (apu.ch3.enable << 2) | (apu.ch2.enable << 1) |
+                   (apu.ch1.enable << 0);
         case 0xff4d:
         case 0xff4f:
         case 0xff68:
@@ -156,7 +162,8 @@ void mmu_write(uint16_t addr, uint8_t value) {
         cpu.memory.wram[addr % 0x2000] = value;
     } else if (addr < 0xfe00) {
         cpu.memory.wram[addr % 0x2000] = value;
-        // ASSERT(0, "Write of 0x%02x to 0x%04x, Nintendo says no\n", value, addr);
+        // ASSERT(0, "Write of 0x%02x to 0x%04x, Nintendo says no\n", value,
+        // addr);
     } else if (addr < 0xfea0) {
         ((uint8_t *)cpu.memory.oam)[addr - 0xfe00] = value;
     } else if (addr < 0xff00) {
