@@ -27,6 +27,8 @@ int main(int argc, char **argv) {
         argc == 2,
         "Incorrect number of parameters, found %d. Usage: \n./gb <game>.gb\n",
         argc);
+    ASSERT(strncmp(".gb", argv[1] + strlen(argv[1]) - 3, 3) == 0,
+           "File extension %s not supported, please provide .gb file!", argv[1] + strlen(argv[1]) - 3);
     FILE *f = fopen(argv[1], "rb");
     *strrchr(argv[1], '.') = 0;
     cpu.filename = argv[1];
