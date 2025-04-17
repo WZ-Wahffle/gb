@@ -64,8 +64,8 @@ typedef struct {
     uint8_t (*read)(uint16_t);
     void (*write)(uint16_t, uint8_t);
     void (*free)(void);
-    uint8_t vram[0x2000];
-    uint8_t wram[0x2000];
+    uint8_t vram[0x4000];
+    uint8_t wram[0x8000];
     uint8_t hram[0x7f];
     oam_t oam[40];
     bool vblank_ie, vblank_if;
@@ -76,6 +76,7 @@ typedef struct {
     uint8_t timer_counter, timer_modulo, timer_clock_select;
     bool timer_enable;
     bool finished_boot;
+    bool select_upper_vram;
 } cpu_mmu_t;
 
 typedef struct {
@@ -118,6 +119,12 @@ typedef struct {
     uint8_t obj_color_1_reg;
     uint32_t obj_color_2[4];
     uint8_t obj_color_2_reg;
+    uint32_t cgb_bg_color_palettes[8][4];
+    bool cgb_bg_color_increment;
+    uint8_t cgb_bg_address;
+    uint32_t cgb_obj_color_palettes[8][4];
+    bool cgb_obj_color_increment;
+    uint8_t cgb_obj_address;
     double remaining_cycles;
     uint8_t scroll_x, scroll_y;
     bool ppu_enable;

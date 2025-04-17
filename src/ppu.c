@@ -104,13 +104,23 @@ static void try_step_cpu(void) {
 void *framebuffer = NULL;
 
 static uint8_t get_window_tile_index(uint8_t x, uint8_t y) {
-    uint16_t base = ppu.window_tile_map_location ? 0x9c00 : 0x9800;
-    return read_8(base + 32 * (y / 8) + (x / 8));
+    uint16_t base = ppu.window_tile_map_location ? 0x1c00 : 0x1800;
+    return cpu.memory.vram[base + 32 * (y / 8) + (x / 8)];
+}
+
+static uint8_t get_window_tile_attr(uint8_t x, uint8_t y) {
+    uint16_t base = ppu.window_tile_map_location ? 0x1c00 : 0x1800;
+    return cpu.memory.vram[0x2000 + base + 32 * (y / 8) + (x / 8)];
 }
 
 static uint8_t get_background_tile_index(uint8_t x, uint8_t y) {
-    uint16_t base = ppu.bg_tile_map_location ? 0x9c00 : 0x9800;
-    return read_8(base + 32 * (y / 8) + (x / 8));
+    uint16_t base = ppu.bg_tile_map_location ? 0x1c00 : 0x1800;
+    return cpu.memory.vram[base + 32 * (y / 8) + (x / 8)];
+}
+
+static uint8_t get_background_tile_attr(uint8_t x, uint8_t y) {
+    uint16_t base = ppu.bg_tile_map_location ? 0x1c00 : 0x1800;
+    return cpu.memory.vram[0x2000 + base + 32 * (y / 8) + (x / 8)];
 }
 
 static uint32_t get_object_tile_color(uint8_t tile_index, uint8_t x, uint8_t y,
@@ -129,18 +139,22 @@ static uint32_t get_object_tile_color(uint8_t tile_index, uint8_t x, uint8_t y,
 }
 
 static uint32_t get_background_window_tile_color(uint8_t tile_index, uint8_t x,
-                                                 uint8_t y) {
+                                                 uint8_t y, bool bank,
+                                                 uint8_t palette) {
     ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
     ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
     uint16_t base = ppu.bg_window_tile_data_location
-                        ? (tile_index < 128 ? 0x8000 : 0x8800)
-                        : (tile_index < 128 ? 0x9000 : 0x8800);
+                        ? (tile_index < 128 ? 0 : 0x1800)
+                        : (tile_index < 128 ? 0x1000 : 0x1800);
+    if (bank)
+        base += 0x2000;
 
     uint16_t sprite_base_address = base + 16 * (tile_index % 128);
-    uint16_t line = read_16(sprite_base_address + y * 2);
+    uint16_t line = TO_U16(cpu.memory.vram[sprite_base_address + y * 2],
+                           cpu.memory.vram[sprite_base_address + y * 2 + 1]);
     uint8_t col_idx = 2 * ((HIBYTE(line) & (1 << (7 - x))) != 0) +
                       ((LOBYTE(line) & (1 << (7 - x))) != 0);
-    return ppu.bg_color[col_idx];
+    return ppu.cgb_bg_color_palettes[palette][col_idx];
 }
 
 static void set_pixel(uint8_t x, uint8_t y, uint32_t value) {
@@ -155,16 +169,30 @@ static void set_window_pixel(uint8_t x, uint8_t y) {
     if (x < ppu.wx - 7 || y < ppu.wy)
         return;
     uint8_t tile_index = get_window_tile_index(x - (ppu.wx - 7), y - ppu.wy);
+    uint8_t tile_attr = get_window_tile_attr(x - (ppu.wx - 7), y - ppu.wy);
+    uint8_t tile_x = ((tile_attr & 0x20) ? (7 - ((x - (ppu.wx - 7)) % 8))
+                                         : ((x - (ppu.wx - 7)) % 8));
+    uint8_t tile_y =
+        ((tile_attr & 0x40) ? (7 - ((y - ppu.wy) % 8)) : ((y - ppu.wy) % 8));
     uint32_t pixel = get_background_window_tile_color(
-        tile_index, (x - (ppu.wx - 7)) % 8, (y - ppu.wy) % 8);
+        tile_index, tile_x, tile_y, tile_attr & 0x8, tile_attr & 0x7);
     set_pixel(x, y, pixel);
 }
 
 static void set_background_pixel(uint8_t x, uint8_t y) {
     uint8_t tile_index =
         get_background_tile_index(x + ppu.scroll_x, y + ppu.scroll_y);
+    uint8_t tile_attr =
+        get_background_tile_attr(x + ppu.scroll_x, y + ppu.scroll_y);
+    uint8_t tile_x =
+        ((tile_attr & 0x20) ? (7 - (x + ppu.scroll_x)) : (x + ppu.scroll_x)) %
+        8;
+    uint8_t tile_y =
+        ((tile_attr & 0x40) ? (7 - (y + ppu.scroll_y)) : (y + ppu.scroll_y)) %
+        8;
+
     uint32_t pixel = get_background_window_tile_color(
-        tile_index, (x + ppu.scroll_x) % 8, (y + ppu.scroll_y) % 8);
+        tile_index, tile_x, tile_y, tile_attr & 0x8, tile_attr & 0x7);
 
     set_pixel(x, y, pixel);
 }
@@ -184,7 +212,8 @@ static void try_step_ppu(void) {
             }
         }
 
-        if(!ppu.ppu_enable) return;
+        if (!ppu.ppu_enable)
+            return;
 
         if (ppu.drawing_x >= 80 && ppu.drawing_x < 240) {
             if (ppu.drawing_y < 144) {
