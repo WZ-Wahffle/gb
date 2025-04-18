@@ -94,11 +94,15 @@ typedef struct {
     double remaining_cycles;
     uint8_t opcode;
     state_t state;
+    bool breakpoint_valid;
     uint16_t breakpoint;
     bool ime;
     uint8_t div;
     bool halted;
     double playback_speed;
+    bool speed_switch_pending;
+    bool fast_mode;
+    bool waiting_for_input;
 
     uint16_t prev_pc[0x10000];
     uint16_t prev_idx;

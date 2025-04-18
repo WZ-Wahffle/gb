@@ -58,7 +58,7 @@ static void try_step_cpu(void) {
         if (cpu.cycles_callback)
             cpu.cycles_callback(elapsed_cycles);
         check_interrupts();
-        if (cpu.pc == cpu.breakpoint) {
+        if (cpu.breakpoint_valid && cpu.pc == cpu.breakpoint) {
             cpu.state = STOPPED;
             return;
         }
@@ -216,7 +216,6 @@ static void try_step_ppu(void) {
 
         if (cpu.memory.hblank_dma_active && ppu.drawing_y < 144 &&
             ppu.drawing_x == 455) {
-                printf("%x\n", cpu.memory.hblank_dma_remaining);
             for (uint8_t i = 0; i < 16; i++) {
                 write_8(cpu.memory.vram_dma_dst++,
                         read_8(cpu.memory.vram_dma_src++));
@@ -358,27 +357,35 @@ void ui(void) {
         ppu.right = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) > 0.5 ||
                     IsKeyDown(KEY_RIGHT);
 
+        if (cpu.waiting_for_input &&
+            (ppu.a || ppu.b || ppu.start || ppu.select || ppu.up || ppu.down ||
+             ppu.left || ppu.right)) {
+            cpu.waiting_for_input = false;
+        }
+
         for (uint32_t i = 0; i < 70224 * cpu.playback_speed; i++) {
-            switch (cpu.state) {
-            case STOPPED:
-                // this page intentionally left blank
-                break;
-            case STEPPED:
-                ppu.remaining_cycles += (-cpu.remaining_cycles) + 1;
-                cpu.remaining_cycles = 1;
-                cpu.state = STOPPED;
-                try_step_cpu();
-                try_step_ppu();
-                break;
-            case RUNNING:
-                cpu.remaining_cycles += CYCLES_PER_DOT;
-                ppu.remaining_cycles += CYCLES_PER_DOT;
-                while (cpu.remaining_cycles > 0 && cpu.state != STOPPED) {
+            if (!cpu.waiting_for_input)
+                switch (cpu.state) {
+                case STOPPED:
+                    // this page intentionally left blank
+                    break;
+                case STEPPED:
+                    ppu.remaining_cycles += (-cpu.remaining_cycles) + 1;
+                    cpu.remaining_cycles = 1;
+                    cpu.state = STOPPED;
                     try_step_cpu();
+                    try_step_ppu();
+                    break;
+                case RUNNING:
+                    cpu.remaining_cycles +=
+                        CYCLES_PER_DOT * (cpu.fast_mode ? 2 : 1);
+                    ppu.remaining_cycles += CYCLES_PER_DOT;
+                    while (cpu.remaining_cycles > 0 && cpu.state != STOPPED) {
+                        try_step_cpu();
+                    }
+                    try_step_ppu();
+                    break;
                 }
-                try_step_ppu();
-                break;
-            }
         }
 
         uint32_t old_value;

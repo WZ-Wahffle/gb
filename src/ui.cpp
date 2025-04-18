@@ -413,14 +413,13 @@ void cpp_imgui_render(void) {
     ImGui::PushItemWidth(4 * ImGui::GetFontSize());
     ImGui::InputText("##bpin", bp_inter, 5);
     ImGui::PopItemWidth();
-    bool valid = true;
     for (char &c : bp_inter) {
         if ((c < '0' || c > '9') && (c < 'a' || c > 'f') &&
             (c < 'A' || c > 'F'))
-            valid = false;
+            cpu.breakpoint_valid = false;
         break;
     }
-    if (!valid) {
+    if (!cpu.breakpoint_valid) {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4{0xff, 0, 0, 0xff}, "Invalid!");
     } else {

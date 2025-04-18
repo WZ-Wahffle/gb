@@ -285,7 +285,9 @@ uint8_t mmu_read(uint16_t addr) {
                    (apu.ch3.enable << 2) | (apu.ch2.enable << 1) |
                    (apu.ch1.enable << 0);
         case 0xff4d:
+            return 0x80;
         case 0xff4f:
+            return cpu.memory.wram_number;
         case 0xff68:
         case 0xff69:
         case 0xff6a:
@@ -528,7 +530,7 @@ void mmu_write(uint16_t addr, uint8_t value) {
                 TODO("DMG compatibility mode");
             break;
         case 0xff4d:
-            TODO("speed switch");
+            if(value & 1) cpu.speed_switch_pending = true;
             break;
         case 0xff4f:
             cpu.memory.select_upper_vram = value & 1;

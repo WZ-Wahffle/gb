@@ -430,7 +430,8 @@ uint8_t execute(void) {
                 cpu.a = result;
             } else if (opcode == 0b00010000) {
                 // stop
-                cpu.state = STOPPED;
+                cpu.waiting_for_input = true;
+                if(cpu.speed_switch_pending) cpu.fast_mode = !cpu.fast_mode;
             } else if (opcode == 0b00010111) {
                 // rla
                 uint8_t result = cpu.a * 2 + (get_status_bit(C_STATUS) ? 1 : 0);
