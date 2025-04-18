@@ -16,9 +16,9 @@ static bool rtc_overflow = 0;
 static bool rtc_halt = 0;
 
 void mbc3_init(FILE *f, uint8_t rom_size, uint8_t ram_size) {
-    ASSERT(rom_size < 7, "MBC1 supports bank keys [0..6], found %d", rom_size);
+    ASSERT(rom_size < 7, "MBC3 supports bank keys [0..6], found %d", rom_size);
     ASSERT(ram_size < 4 && ram_size != 1,
-           "MBC1 supports bank keys [0, 2, 3], found %d", ram_size);
+           "MBC3 supports bank keys [0, 2, 3], found %d", ram_size);
     rom_number = 1;
     rom_size_bytes = 0x8000 * (1 << rom_size);
     rom = calloc(rom_size_bytes, 1);

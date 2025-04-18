@@ -9,9 +9,9 @@ static uint8_t ram_number = 0;
 bool ram_enable = false;
 
 void mbc5_init(FILE *f, uint8_t rom_size, uint8_t ram_size) {
-    ASSERT(rom_size < 9, "MBC1 supports bank keys [0..8], found %d", rom_size);
+    ASSERT(rom_size < 9, "MBC5 supports bank keys [0..8], found %d", rom_size);
     ASSERT(ram_size < 5 && ram_size != 1,
-           "MBC1 supports bank keys [0, 2, 3, 4], found %d", ram_size);
+           "MBC5 supports bank keys [0, 2, 3, 4], found %d", ram_size);
     rom_size_bytes = 0x8000 * (1 << rom_size);
     rom = calloc(rom_size_bytes, 1);
     fread(rom, 1, rom_size_bytes, f);
