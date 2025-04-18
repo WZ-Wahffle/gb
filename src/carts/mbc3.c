@@ -1,5 +1,6 @@
 #include "mbc3.h"
 #include "time.h"
+#include <stdio.h>
 
 static uint8_t *rom = NULL;
 static uint32_t rom_size_bytes = 0;
@@ -122,7 +123,6 @@ void mbc3_free(void) {
 void mbc3_cycle_callback(uint32_t count) {
     static uint32_t cycle_count = 0;
     cycle_count += count;
-    // TODO: potentially adjust for CGB in future
     if (cycle_count >= CPU_FREQ) {
         cycle_count -= CPU_FREQ;
         rtc_s++;
@@ -148,6 +148,14 @@ void mbc3_cycle_callback(uint32_t count) {
 void mbc3_save(FILE * f) {
     fwrite(&ram_size_bytes, 4, 1, f);
     fwrite(ram, 1, ram_size_bytes, f);
+    time_t current_time = time(NULL);
+    fwrite(&current_time, sizeof(time_t), 1, f);
+    fwrite(&rtc_s, 1, 1, f);
+    fwrite(&rtc_m, 1, 1, f);
+    fwrite(&rtc_h, 1, 1, f);
+    fwrite(&rtc_d, 2, 1, f);
+    fwrite(&rtc_overflow, 1, 1, f);
+    fwrite(&rtc_halt, 1, 1, f);
 }
 
 void mbc3_load(FILE * f) {
@@ -155,4 +163,32 @@ void mbc3_load(FILE * f) {
     fread(&ram_size_bytes_tmp, 4, 1, f);
     ASSERT(ram_size_bytes == ram_size_bytes_tmp, "Loaded save file does not match cartridge, expected RAM size %d, got %d", ram_size_bytes, ram_size_bytes_tmp);
     fread(ram, 1, ram_size_bytes, f);
+    time_t current_time = time(NULL);
+    time_t old_time;
+    fread(&old_time, sizeof(time_t), 1, f);
+    fread(&rtc_s, 1, 1, f);
+    fread(&rtc_m, 1, 1, f);
+    fread(&rtc_h, 1, 1, f);
+    fread(&rtc_d, 2, 1, f);
+    fread(&rtc_overflow, 1, 1, f);
+    fread(&rtc_halt, 1, 1, f);
+    time_t elapsed = current_time - old_time;
+    if(rtc_halt) return;
+    rtc_s += elapsed;
+    while(rtc_s >= 60) {
+        rtc_s -= 60;
+        rtc_m++;
+    }
+    while(rtc_m >= 60) {
+        rtc_m -= 60;
+        rtc_h++;
+    }
+    while(rtc_h >= 24) {
+        rtc_h -= 24;
+        rtc_d++;
+    }
+    while(rtc_d >= 512) {
+        rtc_d -= 512;
+        rtc_overflow = !rtc_overflow;
+    }
 }
