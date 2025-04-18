@@ -1,6 +1,7 @@
 #include "apu.h"
 #include "carts/mbc1.h"
 #include "carts/mbc3.h"
+#include "carts/mbc5.h"
 #include "carts/nocart.h"
 #include "ppu.h"
 #include "ui.h"
@@ -28,7 +29,8 @@ int main(int argc, char **argv) {
         "Incorrect number of parameters, found %d. Usage: \n./gbc <game>.gbc\n",
         argc);
     ASSERT(strncmp(".gbc", argv[1] + strlen(argv[1]) - 4, 4) == 0,
-           "File extension %s not supported, please provide .gbc file!", argv[1] + strlen(argv[1]) - 4);
+           "File extension %s not supported, please provide .gbc file!",
+           argv[1] + strlen(argv[1]) - 4);
     FILE *f = fopen(argv[1], "rb");
     *strrchr(argv[1], '.') = 0;
     cpu.filename = argv[1];
@@ -71,6 +73,19 @@ int main(int argc, char **argv) {
         cpu.cycles_callback = mbc3_cycle_callback;
         cpu.save_callback = mbc3_save;
         cpu.load_callback = mbc3_load;
+        break;
+    case 0x19:
+    case 0x1a:
+    case 0x1b:
+    case 0x1c:
+    case 0x1d:
+    case 0x1e:
+        mbc5_init(f, rom_size, ram_size);
+        cpu.memory.read = mbc5_read;
+        cpu.memory.write = mbc5_write;
+        cpu.memory.free = mbc5_free;
+        cpu.save_callback = mbc5_save;
+        cpu.load_callback = mbc5_load;
         break;
     default:
         ASSERT(0, "Unsupported cart type 0x%02x\n", cart_type);
