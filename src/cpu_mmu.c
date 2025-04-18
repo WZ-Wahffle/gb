@@ -213,11 +213,20 @@ uint8_t mmu_read(uint16_t addr) {
             .vram[(cpu.memory.select_upper_vram * 0x2000) + addr % 0x2000];
     } else if (addr < 0xc000) {
         return cpu.memory.read(addr);
+    } else if (addr < 0xd000) {
+        return cpu.memory.wram[addr % 0x1000];
     } else if (addr < 0xe000) {
-        return cpu.memory.wram[addr % 0x2000];
+        return cpu.memory
+            .wram[((cpu.memory.wram_number ? cpu.memory.wram_number : 1) *
+                   0x1000) +
+                  addr % 0x1000];
+    } else if (addr < 0xf000) {
+        return cpu.memory.wram[addr % 0x1000];
     } else if (addr < 0xfe00) {
-        return cpu.memory.wram[addr % 0x2000];
-        // ASSERT(0, "Read from 0x%04x, Nintendo says no\n", addr);
+        return cpu.memory
+            .wram[((cpu.memory.wram_number ? cpu.memory.wram_number : 1) *
+                   0x1000) +
+                  addr % 0x1000];
     } else if (addr < 0xfea0) {
         return ((uint8_t *)cpu.memory.oam)[addr - 0xfe00];
     } else if (addr < 0xff00) {
@@ -281,8 +290,7 @@ uint8_t mmu_read(uint16_t addr) {
         case 0xff69:
         case 0xff6a:
         case 0xff6b:
-        case 0xff70:
-            printf("Read from CGB register\n");
+            printf("Read from CGB register 0x%x\n", addr);
             return 0;
         case 0xff40:
             return (ppu.bg_window_enable << 0) | (ppu.enable_objects << 1) |
@@ -308,6 +316,10 @@ uint8_t mmu_read(uint16_t addr) {
             return ppu.wy;
         case 0xff4b:
             return ppu.wx;
+        case 0xff55:
+            return cpu.memory.hblank_dma_reg;
+        case 0xff70:
+            return cpu.memory.wram_number;
         case 0xffff:
             return (cpu.memory.vblank_ie << 0) | (cpu.memory.lcd_ie << 1) |
                    (cpu.memory.timer_ie << 2) | (cpu.memory.serial_ie << 3) |
@@ -334,12 +346,18 @@ void mmu_write(uint16_t addr, uint8_t value) {
             value;
     } else if (addr < 0xc000) {
         cpu.memory.write(addr, value);
+    } else if (addr < 0xd000) {
+        cpu.memory.wram[addr % 0x1000] = value;
     } else if (addr < 0xe000) {
-        cpu.memory.wram[addr % 0x2000] = value;
+        cpu.memory.wram[((cpu.memory.wram_number ? cpu.memory.wram_number : 1) *
+                         0x1000) +
+                        addr % 0x1000] = value;
+    } else if (addr < 0xf000) {
+        cpu.memory.wram[addr % 0x1000] = value;
     } else if (addr < 0xfe00) {
-        cpu.memory.wram[addr % 0x2000] = value;
-        // ASSERT(0, "Write of 0x%02x to 0x%04x, Nintendo says no\n", value,
-        // addr);
+        cpu.memory.wram[((cpu.memory.wram_number ? cpu.memory.wram_number : 1) *
+                         0x1000) +
+                        addr % 0x1000] = value;
     } else if (addr < 0xfea0) {
         ((uint8_t *)cpu.memory.oam)[addr - 0xfe00] = value;
     } else if (addr < 0xff00) {
@@ -390,6 +408,9 @@ void mmu_write(uint16_t addr, uint8_t value) {
         case 0xff14:
             ch1_period_high_control(value);
             break;
+        case 0xff15:
+            // this page intentionally left blank
+            break;
         case 0xff16:
             ch2_length_timer_duty_cycle(value);
             break;
@@ -420,6 +441,9 @@ void mmu_write(uint16_t addr, uint8_t value) {
             break;
         case 0xff1e:
             ch3_period_high_control(value);
+            break;
+        case 0xff1f:
+            // this page intentionally left blank
             break;
         case 0xff20:
             ch4_length_timer(value);
@@ -499,6 +523,10 @@ void mmu_write(uint16_t addr, uint8_t value) {
         case 0xff4b:
             ppu.wx = value;
             break;
+        case 0xff4c:
+            if (value & 0b100)
+                TODO("DMG compatibility mode");
+            break;
         case 0xff4d:
             TODO("speed switch");
             break;
@@ -507,6 +535,58 @@ void mmu_write(uint16_t addr, uint8_t value) {
             break;
         case 0xff50:
             cpu.memory.finished_boot = true;
+            break;
+        case 0xff51:
+            cpu.memory.vram_dma_src &= 0xff;
+            cpu.memory.vram_dma_src |= value << 8;
+            break;
+        case 0xff52:
+            cpu.memory.vram_dma_src &= 0xff00;
+            cpu.memory.vram_dma_src |= value & 0xf0;
+            break;
+        case 0xff53:
+            cpu.memory.vram_dma_dst &= 0xff;
+            cpu.memory.vram_dma_dst |= ((value & 0x1f) | 0x80) << 8;
+            break;
+        case 0xff54:
+            cpu.memory.vram_dma_dst &= 0xff00;
+            cpu.memory.vram_dma_dst |= value & 0xf0;
+            break;
+        case 0xff55:
+            if (value & 0x80) {
+                cpu.memory.hblank_dma_active = true;
+                cpu.memory.hblank_dma_remaining = ((value & 0x7f) + 1) * 16;
+                cpu.memory.hblank_dma_reg = value & 0x7f;
+
+                // <hack>
+                // for some reason HBlank-based VRAM OAM transfer is too
+                // slow by one iteration, meaning that without the snippet below
+                // games actively watching the process based on line numbers
+                // will cancel the transfer 16 bytes early.
+                for (uint8_t i = 0; i < 16; i++) {
+                    write_8(cpu.memory.vram_dma_dst++,
+                            read_8(cpu.memory.vram_dma_src++));
+                    cpu.memory.hblank_dma_remaining--;
+                }
+                cpu.memory.hblank_dma_reg--;
+                if (cpu.memory.hblank_dma_remaining == 0) {
+                    cpu.memory.hblank_dma_active = false;
+                }
+                cpu.remaining_cycles -= 68;
+                // </hack>
+            } else if (!cpu.memory.hblank_dma_active) {
+                uint16_t to_transfer = ((value & 0x7f) + 1) * 16;
+                while (to_transfer--) {
+                    write_8(cpu.memory.vram_dma_dst++,
+                            read_8(cpu.memory.vram_dma_src++));
+                }
+                cpu.memory.hblank_dma_reg = 0xff;
+            } else {
+                cpu.memory.hblank_dma_active = false;
+                cpu.memory.hblank_dma_reg =
+                    (cpu.memory.hblank_dma_remaining / 16) - 1;
+                cpu.memory.hblank_dma_reg |= 0x80;
+            }
             break;
         case 0xff56:
             printf("Attempted to write to infrared register\n");
@@ -566,7 +646,7 @@ void mmu_write(uint16_t addr, uint8_t value) {
                 ppu.cgb_obj_address++;
             break;
         case 0xff70:
-            printf("Write to CGB register\n");
+            cpu.memory.wram_number = value & 0b111;
             break;
         case 0xff7f:
             // this page intentionally left blank

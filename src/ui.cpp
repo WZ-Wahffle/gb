@@ -502,7 +502,7 @@ void cpp_imgui_render(void) {
         ImGui::Text("BG Tilemap start: %s",
                     ppu.bg_tile_map_location ? "0x9c00" : "0x9800");
         ImGui::Text("BG/WIN Tile Data start: %s",
-                    ppu.bg_window_tile_data_location ? "0x8000" : "0x8800");
+                    ppu.bg_window_tile_data_location ? "0x8000" : "0x9000");
         ImGui::Text("WIN Tilemap start: %s",
                     ppu.window_tile_map_location ? "0x9c00" : "0x9800");
     }

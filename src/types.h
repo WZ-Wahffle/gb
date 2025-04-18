@@ -26,7 +26,7 @@
 #define IN_INTERVAL(val, min, max) ((val) >= (min) && (val) < (max))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define CPU_FREQ 4194304.
+#define CPU_FREQ (4194304. * 2)
 #define VIEWPORT_WIDTH 160
 #define VIEWPORT_HEIGHT 144
 #define WINDOW_WIDTH (VIEWPORT_WIDTH * 6)
@@ -66,6 +66,7 @@ typedef struct {
     void (*free)(void);
     uint8_t vram[0x4000];
     uint8_t wram[0x8000];
+    uint8_t wram_number;
     uint8_t hram[0x7f];
     oam_t oam[40];
     bool vblank_ie, vblank_if;
@@ -77,6 +78,11 @@ typedef struct {
     bool timer_enable;
     bool finished_boot;
     bool select_upper_vram;
+    uint16_t vram_dma_src;
+    uint16_t vram_dma_dst;
+    bool hblank_dma_active;
+    uint16_t hblank_dma_remaining;
+    uint8_t hblank_dma_reg;
 } cpu_mmu_t;
 
 typedef struct {

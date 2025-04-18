@@ -124,18 +124,19 @@ static uint8_t get_background_tile_attr(uint8_t x, uint8_t y) {
 }
 
 static uint32_t get_object_tile_color(uint8_t tile_index, uint8_t x, uint8_t y,
-                                      uint8_t palette) {
+                                      bool bank, uint8_t palette) {
     ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
     ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
-    ASSERT(palette < 2, "Tile palette out of bounds, found %d", palette);
-    uint16_t base = 0x8000;
-    uint16_t sprite_base_address = base + 16 * tile_index;
-    uint16_t line = read_16(sprite_base_address + y * 2);
+    ASSERT(palette < 8, "Tile palette out of bounds, found %d", palette);
+    uint16_t sprite_base_address = (bank ? 0x2000 : 0) + 16 * tile_index;
+    uint16_t line = TO_U16(cpu.memory.vram[sprite_base_address + y * 2],
+                           cpu.memory.vram[sprite_base_address + y * 2 + 1]);
+
     uint8_t col_idx = 2 * ((HIBYTE(line) & (1 << (7 - x))) != 0) +
                       ((LOBYTE(line) & (1 << (7 - x))) != 0);
     if (col_idx == 0)
         return 0;
-    return palette ? ppu.obj_color_2[col_idx] : ppu.obj_color_1[col_idx];
+    return ppu.cgb_obj_color_palettes[palette][col_idx];
 }
 
 static uint32_t get_background_window_tile_color(uint8_t tile_index, uint8_t x,
@@ -144,8 +145,8 @@ static uint32_t get_background_window_tile_color(uint8_t tile_index, uint8_t x,
     ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
     ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
     uint16_t base = ppu.bg_window_tile_data_location
-                        ? (tile_index < 128 ? 0 : 0x1800)
-                        : (tile_index < 128 ? 0x1000 : 0x1800);
+                        ? (tile_index < 128 ? 0 : 0x800)
+                        : (tile_index < 128 ? 0x1000 : 0x800);
     if (bank)
         base += 0x2000;
 
@@ -184,12 +185,10 @@ static void set_background_pixel(uint8_t x, uint8_t y) {
         get_background_tile_index(x + ppu.scroll_x, y + ppu.scroll_y);
     uint8_t tile_attr =
         get_background_tile_attr(x + ppu.scroll_x, y + ppu.scroll_y);
-    uint8_t tile_x =
-        ((tile_attr & 0x20) ? (7 - (x + ppu.scroll_x)) : (x + ppu.scroll_x)) %
-        8;
-    uint8_t tile_y =
-        ((tile_attr & 0x40) ? (7 - (y + ppu.scroll_y)) : (y + ppu.scroll_y)) %
-        8;
+    uint8_t tile_x = (tile_attr & 0x20) ? (7 - ((x + ppu.scroll_x) % 8))
+                                        : ((x + ppu.scroll_x) % 8);
+    uint8_t tile_y = (tile_attr & 0x40) ? (7 - ((y + ppu.scroll_y) % 8))
+                                        : ((y + ppu.scroll_y) % 8);
 
     uint32_t pixel = get_background_window_tile_color(
         tile_index, tile_x, tile_y, tile_attr & 0x8, tile_attr & 0x7);
@@ -214,6 +213,21 @@ static void try_step_ppu(void) {
 
         if (!ppu.ppu_enable)
             return;
+
+        if (cpu.memory.hblank_dma_active && ppu.drawing_y < 144 &&
+            ppu.drawing_x == 455) {
+                printf("%x\n", cpu.memory.hblank_dma_remaining);
+            for (uint8_t i = 0; i < 16; i++) {
+                write_8(cpu.memory.vram_dma_dst++,
+                        read_8(cpu.memory.vram_dma_src++));
+                cpu.memory.hblank_dma_remaining--;
+            }
+            cpu.memory.hblank_dma_reg--;
+            if (cpu.memory.hblank_dma_remaining == 0) {
+                cpu.memory.hblank_dma_active = false;
+            }
+            cpu.remaining_cycles -= 68;
+        }
 
         if (ppu.drawing_x >= 80 && ppu.drawing_x < 240) {
             if (ppu.drawing_y < 144) {
@@ -247,8 +261,8 @@ static void try_step_ppu(void) {
                                     tile_idx |= 1;
                                 uint32_t col_idx = get_object_tile_color(
                                     tile_idx, obj_x, obj_y % 8,
-                                    (cpu.memory.oam[i].attr & 0x10) != 0 ? 1
-                                                                         : 0);
+                                    cpu.memory.oam[i].attr & 8,
+                                    cpu.memory.oam[i].attr & 0b111);
                                 if (col_idx != 0 &&
                                     !((cpu.memory.oam[i].attr & 0x80) != 0 &&
                                       get_pixel(screen_x, screen_y) !=
@@ -271,8 +285,8 @@ static void try_step_ppu(void) {
 
                                 uint32_t col_idx = get_object_tile_color(
                                     cpu.memory.oam[i].tile, obj_x, obj_y,
-                                    (cpu.memory.oam[i].attr & 0x10) != 0 ? 1
-                                                                         : 0);
+                                    cpu.memory.oam[i].attr & 8,
+                                    cpu.memory.oam[i].attr & 0b111);
                                 if (col_idx != 0 &&
                                     !((cpu.memory.oam[i].attr & 0x80) != 0 &&
                                       get_pixel(screen_x, screen_y) !=
