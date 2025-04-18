@@ -287,7 +287,7 @@ uint8_t mmu_read(uint16_t addr) {
         case 0xff4d:
             return 0x80;
         case 0xff4f:
-            return cpu.memory.wram_number;
+            return cpu.memory.select_upper_vram;
         case 0xff68:
         case 0xff69:
         case 0xff6a:
