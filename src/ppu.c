@@ -42,10 +42,10 @@ void set_obj_palette_1(uint8_t value) {
 
 void set_obj_palette_2(uint8_t value) {
     if (cpu.compatibility_mode) {
-        ppu.obj_color_2[0] = ppu.cgb_obj_color_palettes[0][(value >> 0) & 0b11];
-        ppu.obj_color_2[1] = ppu.cgb_obj_color_palettes[0][(value >> 2) & 0b11];
-        ppu.obj_color_2[2] = ppu.cgb_obj_color_palettes[0][(value >> 4) & 0b11];
-        ppu.obj_color_2[3] = ppu.cgb_obj_color_palettes[0][(value >> 6) & 0b11];
+        ppu.obj_color_2[0] = ppu.cgb_obj_color_palettes[1][(value >> 0) & 0b11];
+        ppu.obj_color_2[1] = ppu.cgb_obj_color_palettes[1][(value >> 2) & 0b11];
+        ppu.obj_color_2[2] = ppu.cgb_obj_color_palettes[1][(value >> 4) & 0b11];
+        ppu.obj_color_2[3] = ppu.cgb_obj_color_palettes[1][(value >> 6) & 0b11];
     } else {
         ppu.obj_color_2[0] = colors[(value >> 0) & 0b11];
         ppu.obj_color_2[1] = colors[(value >> 2) & 0b11];
@@ -175,10 +175,6 @@ static uint8_t get_background_window_tile_color(uint8_t tile_index, uint8_t x,
 
 static void set_pixel(uint8_t x, uint8_t y, uint32_t value) {
     ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y] = value;
-}
-
-static uint32_t get_pixel(uint8_t x, uint8_t y) {
-    return ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y];
 }
 
 static uint8_t set_window_pixel(uint8_t x, uint8_t y) {
@@ -364,6 +360,7 @@ static void try_step_ppu(void) {
 void ui(void) {
     SetTraceLogLevel(LOG_ERROR);
     SetTargetFPS(60);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "gb");
     framebuffer = calloc(VIEWPORT_WIDTH * VIEWPORT_HEIGHT * 4, 1);
     Image framebuffer_image = {framebuffer, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, 1,
@@ -439,7 +436,7 @@ void ui(void) {
         UpdateTexture(texture, framebuffer);
         DrawTexturePro(texture,
                        (Rectangle){0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT},
-                       (Rectangle){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT},
+                       (Rectangle){0, 0, GetScreenWidth(), GetScreenHeight()},
                        (Vector2){0, 0}, 0.f, WHITE);
 
         if (show_electron_beam && ppu.drawing_y < 144 && ppu.drawing_x >= 80 &&

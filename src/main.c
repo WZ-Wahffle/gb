@@ -93,20 +93,6 @@ int main(int argc, char **argv) {
         break;
     }
 
-#ifdef SKIP_BOOT
-    cpu.a = 0x01;
-    cpu.f = 0xb0;
-    cpu.b = 0x00;
-    cpu.c = 0x13;
-    cpu.d = 0x00;
-    cpu.e = 0xd8;
-    cpu.h = 0x01;
-    cpu.l = 0x4d;
-    cpu.sp = 0xfffe;
-    cpu.pc = 0x100;
-    cpu.memory.finished_boot = true;
-#endif
-
     cpu.playback_speed = 1;
     ppu.ppu_enable = true;
     thrd_t apu_thread;
