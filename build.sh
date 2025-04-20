@@ -3,16 +3,12 @@
 function build() {
     mkdir -p out
     g++ -c -o src/ui.o src/ui.cpp -Isrc/include/ -Wall -Wextra -Werror -Wno-unused-function
-	gcc -g -o out/gbc src/*.c src/carts/*.c src/ui.o -Isrc/include/ -Lsrc/lib/ -lraylib -lSDL2 -lm -lrlImGui -limgui -Wall -Wextra -Werror -lstdc++ -Wno-unused-function
+	gcc -g -o out/gbc src/*.c src/carts/*.c src/ui.o -static -Isrc/include/ -Lsrc/lib/ -l:libraylib.a -l:libSDL2.a -lm -lrlImGui -limgui -Wall -Wextra -Werror -lstdc++ -Wno-unused-function
 }
 
 function build_raylib() {
     mkdir -p src/include
 	mkdir -p src/lib
-	sed -i 's/$$(RAYLIB_SRC_PATH)\/external\/SDL2\/include/$$(shell pkg-config --cflags sdl2)/g' raylib/src/Makefile
-	sed -i 's/$$(RAYLIB_SRC_PATH)\/external\/SDL2\/lib/$$(shell pkg-config --libs sdl2)/g' raylib/src/Makefile
-	sed -i 's/-I$$(SDL_INCLUDE_PATH)/$$(SDL_INCLUDE_PATH)/g' raylib/src/Makefile
-	sed -i 's/-I$$(SDL_LIBRARY_PATH)/$$(SDL_LIBRARY_PATH)/g' raylib/src/Makefile
 	make -s PLATFORM=PLATFORM_DESKTOP_SDL -C raylib/src/
 	cp raylib/src/libraylib.a src/lib/libraylib.a
 	cp raylib/src/raylib.h src/include/raylib.h
@@ -45,13 +41,36 @@ function build_imgui() {
 	cp imgui/imconfig.h rlImGui/imconfig.h
 }
 
+function build_sdl() {
+    mkdir -p src/include
+	mkdir -p src/lib
+	mkdir -p tmp
+	cd tmp
+	cmake -S ../SDL/ -B .
+	make
+	cd ..
+	cp tmp/libSDL2.a src/lib/libSDL2.a
+	mkdir -p raylib/src/external/SDL2
+	mkdir -p raylib/src/external/SDL2/include
+	mkdir -p raylib/src/external/SDL2/lib
+	cp tmp/libSDL2.a raylib/src/external/SDL2/lib
+	cp tmp/include/SDL2/* raylib/src/external/SDL2/include
+	rm -rf tmp
+}
+
 if [ "$1" = "raylib" ] ; then
     build_raylib
 elif [ "$1" = "rlimgui" ] ; then
     build_rlimgui
 elif [ "$1" = "imgui" ] ; then
     build_imgui
+elif [ "$1" = "sdl" ] ; then
+    build_sdl
 else
+    if [ ! -f src/lib/libSDL2.a ]; then
+        echo "building sdl2"
+        build_sdl
+    fi
     if [ ! -f src/include/raylib.h ]; then
         echo "building raylib"
         build_raylib

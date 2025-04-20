@@ -4,7 +4,8 @@ src/lib/*
 raylib
 rlImGui
 imgui
-imgui-filebrowser
+SDL
+tmp
 imgui.ini
 input/
 *.o
