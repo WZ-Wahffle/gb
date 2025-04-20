@@ -336,7 +336,7 @@ static void try_step_ppu(void) {
             }
 
             ppu.ly = ppu.drawing_y;
-            if (ppu.lyc_int && ppu.ly == ppu.lyc && ppu.drawing_x == 0)
+            if (ppu.lyc_int && ppu.ly == ppu.lyc)
                 cpu.memory.lcd_if = true;
         }
 
