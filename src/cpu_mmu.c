@@ -530,8 +530,8 @@ void mmu_write(uint16_t addr, uint8_t value) {
             ppu.wx = value;
             break;
         case 0xff4c:
-            if (value & 0b100)
-                TODO("DMG compatibility mode");
+            if (value & 0b100 && !cpu.memory.finished_boot)
+                cpu.compatibility_mode = true;
             break;
         case 0xff4d:
             if (value & 1)
@@ -651,6 +651,9 @@ void mmu_write(uint16_t addr, uint8_t value) {
             }
             if (ppu.cgb_obj_color_increment)
                 ppu.cgb_obj_address++;
+            break;
+        case 0xff6c:
+            printf("OAM priority changed, ignored\n");
             break;
         case 0xff70:
             cpu.memory.wram_number = value & 0b111;

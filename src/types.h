@@ -26,7 +26,7 @@
 #define IN_INTERVAL(val, min, max) ((val) >= (min) && (val) < (max))
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define CPU_FREQ (4194304. * 2)
+#define CPU_FREQ 4194304.
 #define VIEWPORT_WIDTH 160
 #define VIEWPORT_HEIGHT 144
 #define WINDOW_WIDTH (VIEWPORT_WIDTH * 6)
@@ -87,6 +87,7 @@ typedef struct {
 
 typedef struct {
     char* filename;
+    bool compatibility_mode;
 
     cpu_mmu_t memory;
     uint8_t a, b, c, d, e, f, h, l;

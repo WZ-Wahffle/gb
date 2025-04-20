@@ -11,26 +11,47 @@ extern apu_t apu;
 static uint32_t colors[] = {0xffffffff, 0xffc8c8c8, 0xff828282, 0xff000000};
 
 void set_bg_palette(uint8_t value) {
-    ppu.bg_color[0] = colors[(value >> 0) & 0b11];
-    ppu.bg_color[1] = colors[(value >> 2) & 0b11];
-    ppu.bg_color[2] = colors[(value >> 4) & 0b11];
-    ppu.bg_color[3] = colors[(value >> 6) & 0b11];
+    if (cpu.compatibility_mode) {
+        ppu.bg_color[0] = ppu.cgb_bg_color_palettes[0][(value >> 0) & 0b11];
+        ppu.bg_color[1] = ppu.cgb_bg_color_palettes[0][(value >> 2) & 0b11];
+        ppu.bg_color[2] = ppu.cgb_bg_color_palettes[0][(value >> 4) & 0b11];
+        ppu.bg_color[3] = ppu.cgb_bg_color_palettes[0][(value >> 6) & 0b11];
+    } else {
+        ppu.bg_color[0] = colors[(value >> 0) & 0b11];
+        ppu.bg_color[1] = colors[(value >> 2) & 0b11];
+        ppu.bg_color[2] = colors[(value >> 4) & 0b11];
+        ppu.bg_color[3] = colors[(value >> 6) & 0b11];
+    }
     ppu.bg_color_reg = value;
 }
 
 void set_obj_palette_1(uint8_t value) {
-    ppu.obj_color_1[0] = colors[(value >> 0) & 0b11];
-    ppu.obj_color_1[1] = colors[(value >> 2) & 0b11];
-    ppu.obj_color_1[2] = colors[(value >> 4) & 0b11];
-    ppu.obj_color_1[3] = colors[(value >> 6) & 0b11];
+    if (cpu.compatibility_mode) {
+        ppu.obj_color_1[0] = ppu.cgb_obj_color_palettes[0][(value >> 0) & 0b11];
+        ppu.obj_color_1[1] = ppu.cgb_obj_color_palettes[0][(value >> 2) & 0b11];
+        ppu.obj_color_1[2] = ppu.cgb_obj_color_palettes[0][(value >> 4) & 0b11];
+        ppu.obj_color_1[3] = ppu.cgb_obj_color_palettes[0][(value >> 6) & 0b11];
+    } else {
+        ppu.obj_color_1[0] = colors[(value >> 0) & 0b11];
+        ppu.obj_color_1[1] = colors[(value >> 2) & 0b11];
+        ppu.obj_color_1[2] = colors[(value >> 4) & 0b11];
+        ppu.obj_color_1[3] = colors[(value >> 6) & 0b11];
+    }
     ppu.obj_color_1_reg = value;
 }
 
 void set_obj_palette_2(uint8_t value) {
-    ppu.obj_color_2[0] = colors[(value >> 0) & 0b11];
-    ppu.obj_color_2[1] = colors[(value >> 2) & 0b11];
-    ppu.obj_color_2[2] = colors[(value >> 4) & 0b11];
-    ppu.obj_color_2[3] = colors[(value >> 6) & 0b11];
+    if (cpu.compatibility_mode) {
+        ppu.obj_color_2[0] = ppu.cgb_obj_color_palettes[0][(value >> 0) & 0b11];
+        ppu.obj_color_2[1] = ppu.cgb_obj_color_palettes[0][(value >> 2) & 0b11];
+        ppu.obj_color_2[2] = ppu.cgb_obj_color_palettes[0][(value >> 4) & 0b11];
+        ppu.obj_color_2[3] = ppu.cgb_obj_color_palettes[0][(value >> 6) & 0b11];
+    } else {
+        ppu.obj_color_2[0] = colors[(value >> 0) & 0b11];
+        ppu.obj_color_2[1] = colors[(value >> 2) & 0b11];
+        ppu.obj_color_2[2] = colors[(value >> 4) & 0b11];
+        ppu.obj_color_2[3] = colors[(value >> 6) & 0b11];
+    }
     ppu.obj_color_2_reg = value;
 }
 
@@ -78,7 +99,7 @@ static void try_step_cpu(void) {
 
         if (cpu.memory.timer_enable) {
             static uint16_t increment_intervals[] = {256, 4, 16, 64};
-            timer_timer += elapsed_cycles / CPU_FREQ;
+            timer_timer += ((cpu.fast_mode ? 2 : 1) * elapsed_cycles) / CPU_FREQ;
             if (timer_timer >
                 (increment_intervals[cpu.memory.timer_clock_select] /
                  (CPU_FREQ / 4.f))) {
@@ -93,7 +114,7 @@ static void try_step_cpu(void) {
             }
         }
 
-        div_timer += elapsed_cycles / CPU_FREQ;
+        div_timer += ((cpu.fast_mode ? 2 : 1) * elapsed_cycles) / CPU_FREQ;
         while (div_timer >= 1.f / 16384.f) {
             cpu.div++;
             div_timer -= 1.f / 16384.f;
@@ -123,25 +144,20 @@ static uint8_t get_background_tile_attr(uint8_t x, uint8_t y) {
     return cpu.memory.vram[0x2000 + base + 32 * (y / 8) + (x / 8)];
 }
 
-static uint32_t get_object_tile_color(uint8_t tile_index, uint8_t x, uint8_t y,
-                                      bool bank, uint8_t palette) {
+static uint8_t get_object_tile_color(uint8_t tile_index, uint8_t x, uint8_t y,
+                                     bool bank) {
     ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
     ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
-    ASSERT(palette < 8, "Tile palette out of bounds, found %d", palette);
     uint16_t sprite_base_address = (bank ? 0x2000 : 0) + 16 * tile_index;
     uint16_t line = TO_U16(cpu.memory.vram[sprite_base_address + y * 2],
                            cpu.memory.vram[sprite_base_address + y * 2 + 1]);
 
-    uint8_t col_idx = 2 * ((HIBYTE(line) & (1 << (7 - x))) != 0) +
-                      ((LOBYTE(line) & (1 << (7 - x))) != 0);
-    if (col_idx == 0)
-        return 0;
-    return ppu.cgb_obj_color_palettes[palette][col_idx];
+    return 2 * ((HIBYTE(line) & (1 << (7 - x))) != 0) +
+           ((LOBYTE(line) & (1 << (7 - x))) != 0);
 }
 
-static uint32_t get_background_window_tile_color(uint8_t tile_index, uint8_t x,
-                                                 uint8_t y, bool bank,
-                                                 uint8_t palette) {
+static uint8_t get_background_window_tile_color(uint8_t tile_index, uint8_t x,
+                                                uint8_t y, bool bank) {
     ASSERT(x < 8, "Tile X position out of bounds, found %d", x);
     ASSERT(y < 8, "Tile Y position out of bounds, found %d", y);
     uint16_t base = ppu.bg_window_tile_data_location
@@ -153,9 +169,8 @@ static uint32_t get_background_window_tile_color(uint8_t tile_index, uint8_t x,
     uint16_t sprite_base_address = base + 16 * (tile_index % 128);
     uint16_t line = TO_U16(cpu.memory.vram[sprite_base_address + y * 2],
                            cpu.memory.vram[sprite_base_address + y * 2 + 1]);
-    uint8_t col_idx = 2 * ((HIBYTE(line) & (1 << (7 - x))) != 0) +
-                      ((LOBYTE(line) & (1 << (7 - x))) != 0);
-    return ppu.cgb_bg_color_palettes[palette][col_idx];
+    return 2 * ((HIBYTE(line) & (1 << (7 - x))) != 0) +
+           ((LOBYTE(line) & (1 << (7 - x))) != 0);
 }
 
 static void set_pixel(uint8_t x, uint8_t y, uint32_t value) {
@@ -166,21 +181,22 @@ static uint32_t get_pixel(uint8_t x, uint8_t y) {
     return ((uint32_t *)framebuffer)[x + VIEWPORT_WIDTH * y];
 }
 
-static void set_window_pixel(uint8_t x, uint8_t y) {
+static uint8_t set_window_pixel(uint8_t x, uint8_t y) {
     if (x < ppu.wx - 7 || y < ppu.wy)
-        return;
+        return 0;
     uint8_t tile_index = get_window_tile_index(x - (ppu.wx - 7), y - ppu.wy);
     uint8_t tile_attr = get_window_tile_attr(x - (ppu.wx - 7), y - ppu.wy);
     uint8_t tile_x = ((tile_attr & 0x20) ? (7 - ((x - (ppu.wx - 7)) % 8))
                                          : ((x - (ppu.wx - 7)) % 8));
     uint8_t tile_y =
         ((tile_attr & 0x40) ? (7 - ((y - ppu.wy) % 8)) : ((y - ppu.wy) % 8));
-    uint32_t pixel = get_background_window_tile_color(
-        tile_index, tile_x, tile_y, tile_attr & 0x8, tile_attr & 0x7);
-    set_pixel(x, y, pixel);
+    uint8_t col_idx = get_background_window_tile_color(tile_index, tile_x,
+                                                       tile_y, tile_attr & 0x8);
+    set_pixel(x, y, ppu.cgb_bg_color_palettes[tile_attr & 0x7][col_idx]);
+    return col_idx;
 }
 
-static void set_background_pixel(uint8_t x, uint8_t y) {
+static uint8_t set_background_pixel(uint8_t x, uint8_t y) {
     uint8_t tile_index =
         get_background_tile_index(x + ppu.scroll_x, y + ppu.scroll_y);
     uint8_t tile_attr =
@@ -190,10 +206,82 @@ static void set_background_pixel(uint8_t x, uint8_t y) {
     uint8_t tile_y = (tile_attr & 0x40) ? (7 - ((y + ppu.scroll_y) % 8))
                                         : ((y + ppu.scroll_y) % 8);
 
-    uint32_t pixel = get_background_window_tile_color(
-        tile_index, tile_x, tile_y, tile_attr & 0x8, tile_attr & 0x7);
+    uint8_t col_idx = get_background_window_tile_color(tile_index, tile_x,
+                                                       tile_y, tile_attr & 0x8);
 
-    set_pixel(x, y, pixel);
+    if (cpu.compatibility_mode) {
+        set_pixel(x, y, ppu.bg_color[col_idx]);
+    } else {
+        set_pixel(x, y, ppu.cgb_bg_color_palettes[tile_attr & 0x7][col_idx]);
+    }
+    return col_idx;
+}
+
+static void set_oam_pixel(uint8_t x, uint8_t y, uint8_t max_idx) {
+    for (int32_t i = 39; i >= 0; i--) {
+        if (ppu.large_objects) {
+            if (IN_INTERVAL(cpu.memory.oam[i].y - 1, y, y + 16) &&
+                IN_INTERVAL(cpu.memory.oam[i].x - 1, x, x + 8)) {
+                uint8_t obj_x = cpu.memory.oam[i].x - 1 - x;
+                uint8_t obj_y = cpu.memory.oam[i].y - 1 - y;
+                if (!(cpu.memory.oam[i].attr & 0x20))
+                    obj_x = 7 - obj_x;
+                if (!(cpu.memory.oam[i].attr & 0x40))
+                    obj_y = 15 - obj_y;
+                uint8_t tile_idx = cpu.memory.oam[i].tile;
+                if (obj_y < 8)
+                    tile_idx &= ~1;
+                else
+                    tile_idx |= 1;
+                uint8_t col_idx = get_object_tile_color(
+                    tile_idx, obj_x, obj_y % 8, cpu.memory.oam[i].attr & 8);
+                uint32_t color = 0;
+                if (cpu.compatibility_mode) {
+                    if (cpu.memory.oam[i].attr & 0x10) {
+                        color = ppu.obj_color_2[col_idx];
+                    } else {
+                        color = ppu.obj_color_1[col_idx];
+                    }
+                } else {
+                    color = ppu.cgb_obj_color_palettes[cpu.memory.oam[i].attr &
+                                                       0x7][col_idx];
+                }
+
+                if (col_idx != 0 &&
+                    !((cpu.memory.oam[i].attr & 0x80) != 0 && max_idx != 0))
+                    set_pixel(x, y, color);
+            }
+        } else {
+            if (IN_INTERVAL(cpu.memory.oam[i].y - 9, y, y + 8) &&
+                IN_INTERVAL(cpu.memory.oam[i].x - 1, x, x + 8)) {
+                uint8_t obj_x = cpu.memory.oam[i].x - 1 - x;
+                uint8_t obj_y = cpu.memory.oam[i].y - 9 - y;
+                if (!(cpu.memory.oam[i].attr & 0x20))
+                    obj_x = 7 - obj_x;
+                if (!(cpu.memory.oam[i].attr & 0x40))
+                    obj_y = 7 - obj_y;
+
+                uint8_t col_idx =
+                    get_object_tile_color(cpu.memory.oam[i].tile, obj_x, obj_y,
+                                          cpu.memory.oam[i].attr & 8);
+                uint32_t color = 0;
+                if (cpu.compatibility_mode) {
+                    if (cpu.memory.oam[i].attr & 0x10) {
+                        color = ppu.obj_color_2[col_idx];
+                    } else {
+                        color = ppu.obj_color_1[col_idx];
+                    }
+                } else {
+                    color = ppu.cgb_obj_color_palettes[cpu.memory.oam[i].attr &
+                                                       0x7][col_idx];
+                }
+
+                if (col_idx != 0 &&
+                    !((cpu.memory.oam[i].attr & 0x80) != 0 && max_idx != 0))
+                    set_pixel(x, y, color);
+            }
+        }
+    }
 }
 
 static void try_step_ppu(void) {
@@ -232,68 +320,18 @@ static void try_step_ppu(void) {
             if (ppu.drawing_y < 144) {
                 uint8_t screen_x = ppu.drawing_x - 80;
                 uint8_t screen_y = ppu.drawing_y;
+
+                uint8_t max_idx = 0;
                 if (ppu.bg_window_enable) {
-                    set_background_pixel(screen_x, screen_y);
+                    max_idx =
+                        MAX(set_background_pixel(screen_x, screen_y), max_idx);
                     if (ppu.window_enable) {
-                        set_window_pixel(screen_x, screen_y);
+                        max_idx =
+                            MAX(set_window_pixel(screen_x, screen_y), max_idx);
                     }
                 }
                 if (ppu.enable_objects) {
-                    for (int32_t i = 39; i >= 0; i--) {
-                        if (ppu.large_objects) {
-                            if (IN_INTERVAL(cpu.memory.oam[i].y - 1, screen_y,
-                                            screen_y + 16) &&
-                                IN_INTERVAL(cpu.memory.oam[i].x - 1, screen_x,
-                                            screen_x + 8)) {
-                                uint8_t obj_x =
-                                    cpu.memory.oam[i].x - 1 - screen_x;
-                                uint8_t obj_y =
-                                    cpu.memory.oam[i].y - 1 - screen_y;
-                                if (!(cpu.memory.oam[i].attr & 0x20))
-                                    obj_x = 7 - obj_x;
-                                if (!(cpu.memory.oam[i].attr & 0x40))
-                                    obj_y = 15 - obj_y;
-                                uint8_t tile_idx = cpu.memory.oam[i].tile;
-                                if (obj_y < 8)
-                                    tile_idx &= ~1;
-                                else
-                                    tile_idx |= 1;
-                                uint32_t col_idx = get_object_tile_color(
-                                    tile_idx, obj_x, obj_y % 8,
-                                    cpu.memory.oam[i].attr & 8,
-                                    cpu.memory.oam[i].attr & 0b111);
-                                if (col_idx != 0 &&
-                                    !((cpu.memory.oam[i].attr & 0x80) != 0 &&
-                                      get_pixel(screen_x, screen_y) !=
-                                          ppu.bg_color[0]))
-                                    set_pixel(screen_x, screen_y, col_idx);
-                            }
-                        } else {
-                            if (IN_INTERVAL(cpu.memory.oam[i].y - 9, screen_y,
-                                            screen_y + 8) &&
-                                IN_INTERVAL(cpu.memory.oam[i].x - 1, screen_x,
-                                            screen_x + 8)) {
-                                uint8_t obj_x =
-                                    cpu.memory.oam[i].x - 1 - screen_x;
-                                uint8_t obj_y =
-                                    cpu.memory.oam[i].y - 9 - screen_y;
-                                if (!(cpu.memory.oam[i].attr & 0x20))
-                                    obj_x = 7 - obj_x;
-                                if (!(cpu.memory.oam[i].attr & 0x40))
-                                    obj_y = 7 - obj_y;
-
-                                uint32_t col_idx = get_object_tile_color(
-                                    cpu.memory.oam[i].tile, obj_x, obj_y,
-                                    cpu.memory.oam[i].attr & 8,
-                                    cpu.memory.oam[i].attr & 0b111);
-                                if (col_idx != 0 &&
-                                    !((cpu.memory.oam[i].attr & 0x80) != 0 &&
-                                      get_pixel(screen_x, screen_y) !=
-                                          ppu.bg_color[0]))
-                                    set_pixel(screen_x, screen_y, col_idx);
-                            }
-                        }
-                    }
+                    set_oam_pixel(screen_x, screen_y, max_idx);
                 }
             }
 

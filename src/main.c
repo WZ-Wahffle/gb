@@ -28,8 +28,9 @@ int main(int argc, char **argv) {
         argc == 2,
         "Incorrect number of parameters, found %d. Usage: \n./gbc <game>.gbc\n",
         argc);
-    ASSERT(strncmp(".gbc", argv[1] + strlen(argv[1]) - 4, 4) == 0,
-           "File extension %s not supported, please provide .gbc file!",
+    ASSERT((strncmp(".gbc", argv[1] + strlen(argv[1]) - 4, 4) == 0) ||
+               (strncmp(".gb", argv[1] + strlen(argv[1]) - 3, 3) == 0),
+           "File extension %s not supported, please provide .gb or .gbc file!",
            argv[1] + strlen(argv[1]) - 4);
     FILE *f = fopen(argv[1], "rb");
     *strrchr(argv[1], '.') = 0;
