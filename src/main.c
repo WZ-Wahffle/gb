@@ -27,7 +27,7 @@ void exit_cb(int code, void *param) {
 int main(int argc, char **argv) {
     ASSERT(
         argc == 2,
-        "Incorrect number of parameters, found %d. Usage: \n./gbc <game>.gbc\n",
+        "Incorrect number of parameters, found %d. Usage: \n./gb <game>.gb(c)\n",
         argc);
     ASSERT((strncmp(".gbc", argv[1] + strlen(argv[1]) - 4, 4) == 0) ||
                (strncmp(".gb", argv[1] + strlen(argv[1]) - 3, 3) == 0),
@@ -43,8 +43,10 @@ int main(int argc, char **argv) {
     fread(&rom_size, 1, 1, f);
     fread(&ram_size, 1, 1, f);
     fseek(f, 0, SEEK_SET);
+    #ifdef DEV
     printf("Cartridge Type %d\n", cart_type);
     printf("ROM Size %d Bytes\n", 32768 * (1 << rom_size));
+    #endif
 
     switch (cart_type) {
     case 0x00:
