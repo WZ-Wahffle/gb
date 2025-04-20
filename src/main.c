@@ -4,7 +4,6 @@
 #include "carts/mbc5.h"
 #include "carts/nocart.h"
 #include "ppu.h"
-#include "ui.h"
 #include <string.h>
 #include <threads.h>
 
@@ -12,6 +11,7 @@ extern cpu_t cpu;
 extern ppu_t ppu;
 extern apu_t apu;
 
+#ifdef DEV
 void exit_cb(int code, void *param) {
     (void)code;
     (void)param;
@@ -22,6 +22,7 @@ void exit_cb(int code, void *param) {
                opcode_to_string(cpu.prev_opcode[idx]));
     }
 }
+#endif
 
 int main(int argc, char **argv) {
     ASSERT(
@@ -98,7 +99,9 @@ int main(int argc, char **argv) {
     thrd_t apu_thread;
     thrd_create(&apu_thread, apu_init, NULL);
     thrd_detach(apu_thread);
+#ifdef DEV
     on_exit(exit_cb, NULL);
+#endif
     ui();
 
     cpu.memory.free();

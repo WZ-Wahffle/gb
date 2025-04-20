@@ -380,17 +380,17 @@ void ui(void) {
         ppu.b = IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
                 IsKeyDown(KEY_B);
         ppu.start = IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) ||
-                    IsKeyDown(KEY_RIGHT_SHIFT);
+                    IsKeyDown(KEY_RIGHT_SHIFT) || IsKeyDown(KEY_ENTER);
         ppu.select = IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_LEFT) ||
                      IsKeyDown(KEY_LEFT_SHIFT);
         ppu.up = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) < -0.5 ||
-                 IsKeyDown(KEY_UP);
+                 IsKeyDown(KEY_UP) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_UP);
         ppu.down = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) > 0.5 ||
-                   IsKeyDown(KEY_DOWN);
+                   IsKeyDown(KEY_DOWN) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_DOWN);
         ppu.left = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) < -0.5 ||
-                   IsKeyDown(KEY_LEFT);
+                   IsKeyDown(KEY_LEFT) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_LEFT);
         ppu.right = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) > 0.5 ||
-                    IsKeyDown(KEY_RIGHT);
+                    IsKeyDown(KEY_RIGHT) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_RIGHT);
 
         if (cpu.waiting_for_input &&
             (ppu.a || ppu.b || ppu.start || ppu.select || ppu.up || ppu.down ||

@@ -3,7 +3,7 @@
 function build() {
     mkdir -p out
     g++ -O3 -c -o src/ui.o src/ui.cpp -Isrc/include/ -Wall -Wextra -Werror -Wno-unused-function
-	gcc -O3 -o out/gb -static src/*.c src/carts/*.c src/ui.o -Isrc/include/ -Lsrc/lib/ -l:libraylib.a -l:libSDL2.a -lm -lrlImGui -limgui -Wall -Wextra -Werror -lstdc++
+	gcc -O3 -o out/gb src/*.c src/carts/*.c src/ui.o -Isrc/include/ -Lsrc/lib/ -l:libraylib.a -l:libSDL2.a -lm -lrlImGui -limgui -Wall -Wextra -Werror -lstdc++
 }
 
 function build_raylib() {
