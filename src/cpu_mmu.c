@@ -572,14 +572,14 @@ void mmu_write(uint16_t addr, uint8_t value) {
                 // will cancel the transfer 16 bytes early.
                 for (uint8_t i = 0; i < 16; i++) {
                     write_8(cpu.memory.vram_dma_dst++,
-                            read_8(cpu.memory.vram_dma_src++));
+                                read_8(cpu.memory.vram_dma_src++));
                     cpu.memory.hblank_dma_remaining--;
                 }
                 cpu.memory.hblank_dma_reg--;
                 if (cpu.memory.hblank_dma_remaining == 0) {
                     cpu.memory.hblank_dma_active = false;
                 }
-                cpu.remaining_cycles -= 68;
+                cpu.remaining_cycles -= 4;
                 // </hack>
             } else if (!cpu.memory.hblank_dma_active) {
                 uint16_t to_transfer = ((value & 0x7f) + 1) * 16;

@@ -99,7 +99,8 @@ static void try_step_cpu(void) {
 
         if (cpu.memory.timer_enable) {
             static uint16_t increment_intervals[] = {256, 4, 16, 64};
-            timer_timer += ((cpu.fast_mode ? 2 : 1) * elapsed_cycles) / CPU_FREQ;
+            timer_timer +=
+                ((cpu.fast_mode ? 2 : 1) * elapsed_cycles) / CPU_FREQ;
             if (timer_timer >
                 (increment_intervals[cpu.memory.timer_clock_select] /
                  (CPU_FREQ / 4.f))) {
@@ -309,7 +310,7 @@ static void try_step_ppu(void) {
             if (cpu.memory.hblank_dma_remaining == 0) {
                 cpu.memory.hblank_dma_active = false;
             }
-            cpu.remaining_cycles -= 68;
+            cpu.remaining_cycles -= 4;
         }
 
         if (ppu.drawing_x >= 80 && ppu.drawing_x < 240) {
@@ -384,13 +385,17 @@ void ui(void) {
         ppu.select = IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_LEFT) ||
                      IsKeyDown(KEY_LEFT_SHIFT);
         ppu.up = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) < -0.5 ||
-                 IsKeyDown(KEY_UP) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_UP);
+                 IsKeyDown(KEY_UP) ||
+                 IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_UP);
         ppu.down = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_Y) > 0.5 ||
-                   IsKeyDown(KEY_DOWN) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_DOWN);
+                   IsKeyDown(KEY_DOWN) ||
+                   IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_DOWN);
         ppu.left = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) < -0.5 ||
-                   IsKeyDown(KEY_LEFT) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_LEFT);
+                   IsKeyDown(KEY_LEFT) ||
+                   IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_LEFT);
         ppu.right = GetGamepadAxisMovement(0, GAMEPAD_AXIS_LEFT_X) > 0.5 ||
-                    IsKeyDown(KEY_RIGHT) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_RIGHT);
+                    IsKeyDown(KEY_RIGHT) ||
+                    IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_RIGHT);
 
         if (cpu.waiting_for_input &&
             (ppu.a || ppu.b || ppu.start || ppu.select || ppu.up || ppu.down ||
