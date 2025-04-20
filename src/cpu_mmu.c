@@ -270,6 +270,9 @@ uint8_t mmu_read(uint16_t addr) {
         case 0xff1e:
             return (apu.ch3.enable << 7) | (apu.ch3.length_enable << 6) |
                    (apu.ch3.period_low);
+        case 0xff22:
+            return (apu.ch4.clock_shift << 4) | (apu.ch4.narrow_lfsr << 3) |
+                   ((uint8_t)apu.ch4.clock_divider);
         case 0xff23:
             return (apu.ch4.enable << 7) | (apu.ch4.length_enable << 6);
         case 0xff24:
@@ -285,7 +288,7 @@ uint8_t mmu_read(uint16_t addr) {
                    (apu.ch3.enable << 2) | (apu.ch2.enable << 1) |
                    (apu.ch1.enable << 0);
         case 0xff4d:
-            return 0x80;
+            return cpu.fast_mode << 7;
         case 0xff4f:
             return cpu.memory.select_upper_vram;
         case 0xff68:
@@ -301,9 +304,10 @@ uint8_t mmu_read(uint16_t addr) {
                    (ppu.window_enable << 5) |
                    (ppu.window_tile_map_location << 6) | (ppu.ppu_enable << 7);
         case 0xff41:
-            return (ppu.mode << 0) | ((ppu.ly == ppu.lyc) << 2) |
-                   (ppu.mode_0_int << 3) | (ppu.mode_1_int << 4) |
-                   (ppu.mode_2_int << 5) | (ppu.lyc_int << 6);
+            return (ppu.ppu_enable ? ppu.mode : 0) |
+                   ((ppu.ly == ppu.lyc) << 2) | (ppu.mode_0_int << 3) |
+                   (ppu.mode_1_int << 4) | (ppu.mode_2_int << 5) |
+                   (ppu.lyc_int << 6);
         case 0xff42:
             return ppu.scroll_y;
         case 0xff44:
@@ -530,7 +534,8 @@ void mmu_write(uint16_t addr, uint8_t value) {
                 TODO("DMG compatibility mode");
             break;
         case 0xff4d:
-            if(value & 1) cpu.speed_switch_pending = true;
+            if (value & 1)
+                cpu.speed_switch_pending = true;
             break;
         case 0xff4f:
             cpu.memory.select_upper_vram = value & 1;

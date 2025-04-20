@@ -413,6 +413,7 @@ void cpp_imgui_render(void) {
     ImGui::PushItemWidth(4 * ImGui::GetFontSize());
     ImGui::InputText("##bpin", bp_inter, 5);
     ImGui::PopItemWidth();
+    cpu.breakpoint_valid = true;
     for (char &c : bp_inter) {
         if ((c < '0' || c > '9') && (c < 'a' || c > 'f') &&
             (c < 'A' || c > 'F'))
