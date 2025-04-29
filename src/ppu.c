@@ -376,10 +376,18 @@ void ui(void) {
         BeginDrawing();
         ClearBackground(BLACK);
 
-        ppu.a = IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) ||
-                IsKeyDown(KEY_A);
-        ppu.b = IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
-                IsKeyDown(KEY_B);
+        ppu.a =
+            IsGamepadButtonDown(
+                0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) || // will always correspond
+                                                      // to what SDL sees as the
+                                                      // A button
+            IsKeyDown(KEY_A);
+        ppu.b =
+            IsGamepadButtonDown(
+                0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) || // will always correspond
+                                                       // to what SDL sees as
+                                                       // the B button
+            IsKeyDown(KEY_B);
         ppu.start = IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_RIGHT) ||
                     IsKeyDown(KEY_RIGHT_SHIFT) || IsKeyDown(KEY_ENTER);
         ppu.select = IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_LEFT) ||
